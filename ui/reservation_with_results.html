@@ -1,0 +1,113 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>教室予約申請</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 5px; text-align: center; font-size: 0.9rem; }
+    th { background-color: #f0f0f0; }
+    .instruction { background-color: #e0f7fa; padding: 10px; margin-bottom: 15px; font-size: 0.95rem; }
+    .notice-box { width: 100%; height: 50px; font-size: 1rem; margin-top: 10px; }
+    button { padding: 10px 20px; margin-top: 20px; font-size: 1rem; }
+    pre { background: #f9f9f9; padding: 1em; margin-top: 1em; }
+
+    .awarded {
+      background-color: #d0f0d0;
+      font-weight: bold;
+    }
+
+    .rejected {
+      background-color: #f0d0d0;
+      text-decoration: line-through;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>教室予約申請フォーム</h1>
+
+  <div class="instruction">📢 抽選に申し込む教室を選択し、画面一番下の「申込を完了」をクリックしてください。</div>
+
+  <label>教務からの注意事項：</label>
+  <textarea class="notice-box" id="notice-area" readonly>例：C棟全体は6/22（土）音出し禁止です。</textarea>
+
+  <table id="reservation-table">
+    <thead>
+      <tr>
+        <th>講義室</th><th>定員</th><th>席</th>
+        <th>6/17</th><th>6/18</th><th>6/19</th><th>6/20</th>
+        <th>6/21</th><th>6/22</th><th>6/23</th>
+      </tr>
+    </thead>
+    <tbody id="table-body">
+      <!-- 教室データの行は別途JSで挿入される -->
+    </tbody>
+  </table>
+
+  <button onclick="submitSelection()">申込を完了</button>
+
+  <h2>📦 提出データ（ペアに共有）</h2>
+  <pre id="output">ここに出力されます</pre>
+
+  <script>
+    const rooms = [
+      ["C101", 105, "固定"], ["C104", 52, "セパ"], ["C105", 68, "セパ"], ["C106", 102, "セパ"],
+      ["C202", 156, "固定"], ["C203", 73, "固定"], ["C204", 44, "セパ"], ["C205", 60, "固定"],
+      ["C206", 106, "固定"], ["C301", 105, "固定"], ["C302", 156, "固定"], ["C303", 72, "固定"],
+      ["C304", 51, "セパ"], ["C305", 54, "固定"], ["C306", 106, "固定"], ["C307", 72, "固定"],
+      ["C308", 72, "固定"], ["C401", 105, "固定"], ["C402", 156, "固定"], ["C403", 72, "固定"],
+      ["C404", 53, "セパ"], ["C405", 54, "固定"], ["C406", 106, "固定"], ["C407", 36, "セパ"],
+      ["C408", 36, "セパ"], ["C409", 36, "セパ"], ["講義室", 309, "固定"]
+    ];
+
+    const tableBody = document.getElementById("table-body");
+
+    // 抽選結果データ（アルゴリズム班から受け取る形）
+    const allocationResults = {
+      "C101_0": "当選",
+      "C101_1": "落選",
+      "C106_4": "当選",
+      "C203_6": "落選"
+    };
+
+    // 初期テーブル生成
+    for (let [room, capacity, seat] of rooms) {
+      let row = `<tr><td>${room}</td><td>${capacity}</td><td>${seat}</td>`;
+      for (let day = 0; day < 7; day++) {
+        const key = `${room}_${day}`;
+        const result = allocationResults[key];
+        if (result === "当選") {
+          row += `<td class="awarded">当選</td>`;
+        } else if (result === "落選") {
+          row += `<td class="rejected">落選</td>`;
+        } else {
+          row += `<td><input type="checkbox" data-room="${room}" data-day="${day}"></td>`;
+        }
+      }
+      row += "</tr>";
+      tableBody.innerHTML += row;
+    }
+
+    // 申請ボタン押下時の処理
+    function submitSelection() {
+      const checkboxes = document.querySelectorAll('input[type=checkbox]:checked');
+      const selected = Array.from(checkboxes).map(cb => ({
+        room: cb.dataset.room,
+        day: cb.dataset.day
+      }));
+      const requestData = {
+        user: "サークルA",  // 仮のユーザ名
+        selections: selected,
+        timestamp: new Date().toISOString()
+      };
+      document.getElementById("output").textContent = JSON.stringify(requestData, null, 2);
+      console.log("🔽 抽選申請データ:", requestData);
+    }
+  </script>
+
+</body>
+</html>
