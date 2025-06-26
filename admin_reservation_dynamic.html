@@ -1,0 +1,139 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>教務用 教室予約管理</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 5px; text-align: center; font-size: 0.9rem; }
+    th { background-color: #f0f0f0; }
+    select { font-size: 0.9rem; }
+    .note-area, .date-area { margin-top: 20px; }
+    textarea { width: 100%; height: 60px; font-size: 1rem; }
+    input[type="date"] { font-size: 1rem; }
+    button { margin-top: 20px; padding: 10px 20px; font-size: 1rem; }
+    .saved-message { color: green; margin-top: 10px; }
+    .bg-使用不可 { background-color: #fdd; }
+    .bg-音出し不可 { background-color: #ffd; }
+    .bg-抽選中 { background-color: #ddf; }
+    .bg-予約済 { background-color: #dfd; }
+  </style>
+</head>
+<body>
+
+<h1>教務用：教室予約設定画面</h1>
+
+<div class="date-area">
+  <label>📅 表示を開始する日付（例：2025-06-17）：</label>
+  <input type="date" id="start-date" />
+</div>
+
+<div class="note-area">
+  <label>📢 学生に表示される注意文を入力：</label>
+  <textarea id="admin-note">例：C棟全体は6/22（土）音出し禁止です。</textarea>
+</div>
+
+<table id="reservation-table">
+  <thead>
+    <tr>
+      <th>講義室</th><th>定員</th><th>席</th>
+      <th id="day0"></th><th id="day1"></th><th id="day2"></th>
+      <th id="day3"></th><th id="day4"></th><th id="day5"></th><th id="day6"></th>
+    </tr>
+  </thead>
+  <tbody id="table-body"></tbody>
+</table>
+
+<button onclick="saveSettings()">変更を保存</button>
+<div class="saved-message" id="save-status"></div>
+
+<script>
+const rooms = [
+  ["C101", 105, "固定"], ["C104", 52, "セパ"], ["C105", 68, "セパ"], ["C106", 102, "セパ"],
+  ["C202", 156, "固定"], ["C203", 73, "固定"], ["C204", 44, "セパ"], ["C205", 60, "固定"],
+  ["C206", 106, "固定"], ["C301", 105, "固定"], ["C302", 156, "固定"], ["C303", 72, "固定"],
+  ["C304", 51, "セパ"], ["C305", 54, "固定"], ["C306", 106, "固定"], ["C307", 72, "固定"],
+  ["C308", 72, "固定"], ["C401", 105, "固定"], ["C402", 156, "固定"], ["C403", 72, "固定"],
+  ["C404", 53, "セパ"], ["C405", 54, "固定"], ["C406", 106, "固定"], ["C407", 36, "セパ"],
+  ["C408", 36, "セパ"], ["C409", 36, "セパ"], ["講義室", 309, "固定"]
+];
+
+function formatDate(date) {
+  return date.getMonth()+1 + "/" + date.getDate();
+}
+
+function updateHeaders(startDate) {
+  const base = new Date(startDate);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(base);
+    d.setDate(base.getDate() + i);
+    document.getElementById("day" + i).textContent = formatDate(d);
+  }
+}
+
+function generateTable() {
+  const tbody = document.getElementById("table-body");
+  tbody.innerHTML = "";
+  const statusData = JSON.parse(localStorage.getItem("roomStatus") || "{}");
+  const startDate = document.getElementById("start-date").value;
+  localStorage.setItem("startDate", startDate);
+
+  for (let [room, cap, seat] of rooms) {
+    let row = `<tr><td>${room}</td><td>${cap}</td><td>${seat}</td>`;
+    for (let day = 0; day < 7; day++) {
+      const key = `${room}_${day}`;
+      const value = statusData[key] || "使用可";
+      row += `<td class="bg-${value}">
+        <select data-room="${room}" data-day="${day}" onchange="updateCellStyle(this)">
+          <option value="使用可"${value==="使用可"?" selected":""}>使用可</option>
+          <option value="使用不可"${value==="使用不可"?" selected":""}>使用不可</option>
+          <option value="音出し不可"${value==="音出し不可"?" selected":""}>音出し不可</option>
+          <option value="抽選中"${value==="抽選中"?" selected":""}>抽選中</option>
+          <option value="予約済"${value==="予約済"?" selected":""}>予約済</option>
+        </select>
+      </td>`;
+    }
+    row += "</tr>";
+    tbody.innerHTML += row;
+  }
+
+  updateHeaders(startDate);
+}
+
+function updateCellStyle(selectElem) {
+  const td = selectElem.closest("td");
+  td.className = "bg-" + selectElem.value;
+}
+
+function saveSettings() {
+  const note = document.getElementById("admin-note").value;
+  localStorage.setItem("adminNote", note);
+  const selects = document.querySelectorAll("select");
+  const statusData = {};
+  selects.forEach(sel => {
+    const key = sel.dataset.room + "_" + sel.dataset.day;
+    statusData[key] = sel.value;
+  });
+  localStorage.setItem("roomStatus", JSON.stringify(statusData));
+  document.getElementById("save-status").textContent = "✅ 保存しました（学生画面に反映されます）";
+}
+
+window.onload = () => {
+  const note = localStorage.getItem("adminNote");
+  if (note) document.getElementById("admin-note").value = note;
+
+  const storedDate = localStorage.getItem("startDate");
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById("start-date").value = storedDate || today;
+
+  generateTable();
+};
+
+document.getElementById("start-date").addEventListener("change", generateTable);
+</script>
+
+</body>
+</html>
