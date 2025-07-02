@@ -1,0 +1,555 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { 
+  getCurrentReservationPeriod, 
+  generateWeekDates, 
+  debugPeriodInfo,
+  ReservationPeriod
+} from '../../utils/dateManager';
+
+interface Classroom {
+  name: string;
+  capacity: number;
+  status: string;
+  available_per_day: Record<string, string>;
+}
+
+interface Club {
+  name: string;
+  password: string;
+}
+
+interface ReservationSlot {
+  preferences: string[]; // 第1〜5希望の教室名
+}
+
+interface DateReservation {
+  date: string;
+  slotCount: number; // この日の予約スロット数（1-3）
+  slots: ReservationSlot[]; // 各スロットの希望教室
+}
+
+interface ReservationRequest {
+  user: string;
+  selections: Array<{
+    day: string;
+    reservations: Array<{
+      preferences: string[]; // 第1〜5希望
+    }>;
+  }>;
+  timestamp: string;
+}
+
+export default function StudentPage() {
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [selectedClub, setSelectedClub] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [notice, setNotice] = useState<string>('例：C棟全体は6/22（土）音出し禁止です。');
+  // 新しい予約システムの状態管理
+  const [dateReservations, setDateReservations] = useState<Record<string, DateReservation>>({});
+  const [allocationResults, setAllocationResults] = useState<Record<string, string>>({});
+  const [outputData, setOutputData] = useState<string>('');
+  
+  // 管理画面で設定された教室の利用可否状態
+  const [roomStatus, setRoomStatus] = useState<Record<string, string>>({});
+
+  // 新しい日付管理システム
+  const [reservationPeriod, setReservationPeriod] = useState<ReservationPeriod | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<'first' | 'second'>('first');
+  const [dates, setDates] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetchClassrooms();
+    fetchClubs();
+    
+    // 管理画面で設定された教室の利用可否状態を読み込み
+    const savedRoomStatus = localStorage.getItem('roomStatus');
+    if (savedRoomStatus) {
+      setRoomStatus(JSON.parse(savedRoomStatus));
+    }
+    
+    // 新しい日付管理システムの初期化
+    const period = getCurrentReservationPeriod();
+    setReservationPeriod(period);
+    
+    // デバッグ情報をコンソールに出力
+    console.log('予約期間情報:', debugPeriodInfo(period));
+    
+    // 初期表示は前半週
+    const initialDates = generateWeekDates(period.firstWeek);
+    setDates(initialDates);
+    
+    // サンプルの抽選結果データ（新しいキー形式に更新）
+    setAllocationResults({
+      "C101_7/14": "当選",
+      "C101_7/15": "落選",
+      "C106_7/18": "当選",
+      "C203_7/20": "落選"
+    });
+  }, []);
+
+  // 週選択が変更されたときの処理
+  useEffect(() => {
+    if (reservationPeriod) {
+      const weekPeriod = selectedWeek === 'first' ? reservationPeriod.firstWeek : reservationPeriod.secondWeek;
+      const newDates = generateWeekDates(weekPeriod);
+      setDates(newDates);
+      
+      // 新しい日付に対応する予約データを初期化
+      const initialReservations: Record<string, DateReservation> = {};
+      newDates.forEach(date => {
+        initialReservations[date] = {
+          date,
+          slotCount: 1, // デフォルトは1つの予約スロット
+          slots: [{
+            preferences: ['', '', '', '', ''] // 第1〜5希望（初期は空）
+          }]
+        };
+      });
+      setDateReservations(initialReservations);
+    }
+  }, [selectedWeek, reservationPeriod]);
+
+  const fetchClassrooms = async () => {
+    try {
+      const response = await fetch('/api/classrooms');
+      const data = await response.json();
+      setClassrooms(data);
+    } catch (error) {
+      console.error('教室データの取得に失敗しました:', error);
+      // サンプルデータ
+      setClassrooms([
+        { name: "C101", capacity: 105, status: "固定", available_per_day: {} },
+        { name: "C104", capacity: 52, status: "セパ", available_per_day: {} },
+        { name: "C105", capacity: 68, status: "セパ", available_per_day: {} },
+        { name: "C106", capacity: 102, status: "セパ", available_per_day: {} },
+        { name: "C202", capacity: 156, status: "固定", available_per_day: {} },
+        { name: "C203", capacity: 73, status: "固定", available_per_day: {} },
+        { name: "C204", capacity: 44, status: "セパ", available_per_day: {} },
+        { name: "C205", capacity: 60, status: "固定", available_per_day: {} },
+        { name: "C206", capacity: 106, status: "固定", available_per_day: {} },
+        { name: "C301", capacity: 105, status: "固定", available_per_day: {} },
+        { name: "C302", capacity: 156, status: "固定", available_per_day: {} },
+        { name: "C303", capacity: 72, status: "固定", available_per_day: {} },
+        { name: "C304", capacity: 51, status: "セパ", available_per_day: {} },
+        { name: "C305", capacity: 54, status: "固定", available_per_day: {} },
+        { name: "C306", capacity: 106, status: "固定", available_per_day: {} },
+        { name: "C307", capacity: 72, status: "固定", available_per_day: {} },
+        { name: "C308", capacity: 72, status: "固定", available_per_day: {} },
+        { name: "C401", capacity: 105, status: "固定", available_per_day: {} },
+        { name: "C402", capacity: 156, status: "固定", available_per_day: {} },
+        { name: "C403", capacity: 72, status: "固定", available_per_day: {} },
+        { name: "C404", capacity: 53, status: "セパ", available_per_day: {} },
+        { name: "C405", capacity: 54, status: "固定", available_per_day: {} },
+        { name: "C406", capacity: 106, status: "固定", available_per_day: {} },
+        { name: "C407", capacity: 36, status: "セパ", available_per_day: {} },
+        { name: "C408", capacity: 36, status: "セパ", available_per_day: {} },
+        { name: "C409", capacity: 36, status: "セパ", available_per_day: {} },
+        { name: "講義室", capacity: 309, status: "固定", available_per_day: {} }
+      ]);
+    }
+  };
+
+  const fetchClubs = async () => {
+    try {
+      const response = await fetch('/api/clubs');
+      const data = await response.json();
+      setClubs(data);
+    } catch (error) {
+      console.error('部活データの取得に失敗しました:', error);
+      // サンプルデータ
+      setClubs([
+        { name: "野球部", password: "baseball" },
+        { name: "サッカー部", password: "soccer" },
+        { name: "軽音学部", password: "lightmusic" }
+      ]);
+    }
+  };
+
+  const handleLogin = () => {
+    const club = clubs.find(c => c.name === selectedClub);
+    if (club && club.password === password) {
+      setIsLoggedIn(true);
+    } else {
+      alert('部活名またはパスワードが間違っています。');
+    }
+  };
+
+  // 日付の予約スロット数を変更する関数
+  const updateSlotCount = (date: string, count: number) => {
+    setDateReservations(prev => {
+      const existing = prev[date] || {
+        date,
+        slotCount: 1,
+        slots: [{ preferences: ['', '', '', '', ''] }]
+      };
+      
+      const newSlots = Array.from({ length: count }, (_, index) => 
+        existing.slots[index] || { preferences: ['', '', '', '', ''] }
+      );
+      
+      return {
+        ...prev,
+        [date]: {
+          ...existing,
+          slotCount: count,
+          slots: newSlots
+        }
+      };
+    });
+  };
+
+  // 特定の予約スロットの希望順位を更新する関数
+  const updatePreference = (date: string, slotIndex: number, preferenceIndex: number, classroom: string) => {
+    setDateReservations(prev => {
+      const existing = prev[date];
+      if (!existing) return prev;
+      
+      const newSlots = [...existing.slots];
+      const newPreferences = [...newSlots[slotIndex].preferences];
+      newPreferences[preferenceIndex] = classroom;
+      newSlots[slotIndex] = { preferences: newPreferences };
+      
+      return {
+        ...prev,
+        [date]: {
+          ...existing,
+          slots: newSlots
+        }
+      };
+    });
+  };
+
+  // 特定の日付での教室の利用可否を取得する関数
+  const getClassroomAvailability = (classroomName: string, date: string) => {
+    const key = `${classroomName}_${date}`;
+    return roomStatus[key] || '使用可';
+  };
+
+  // 特定の日付で利用可能な教室の選択肢を生成する関数
+  const getAvailableClassroomOptions = (date: string): Array<{value: string, label: string, classroom: Classroom}> => {
+    return classrooms
+      .map(classroom => {
+        const availability = getClassroomAvailability(classroom.name, date);
+        
+        // 利用不可の場合は除外
+        if (availability === '使用不可') {
+          return null;
+        }
+        
+        // 音出し禁止の場合は追記
+        let displayName = `${classroom.name} (${classroom.capacity}人・${classroom.status})`;
+        if (availability === '音出し不可') {
+          displayName += ' ※音出し禁止';
+        } else if (availability === '抽選中') {
+          displayName += ' ※抽選中';
+        } else if (availability === '予約済') {
+          displayName += ' ※予約済';
+        }
+        
+        return {
+          value: classroom.name,
+          label: displayName,
+          classroom: classroom
+        };
+      })
+      .filter((option): option is {value: string, label: string, classroom: Classroom} => option !== null);
+  };
+
+  const submitSelection = async () => {
+    // 新しいデータ構造から申請データを生成
+    const selections = Object.values(dateReservations)
+      .filter(dateRes => dateRes.slots.some(slot => slot.preferences.some(pref => pref !== '')))
+      .map(dateRes => ({
+        day: dateRes.date,
+        reservations: dateRes.slots
+          .filter(slot => slot.preferences.some(pref => pref !== ''))
+          .map(slot => ({
+            preferences: slot.preferences.filter(pref => pref !== '')
+          }))
+      }));
+
+    const requestData: ReservationRequest = {
+      user: selectedClub,
+      selections,
+      timestamp: new Date().toISOString()
+    };
+
+    setOutputData(JSON.stringify(requestData, null, 2));
+    console.log("🔽 抽選申請データ:", requestData);
+
+    // APIに予約申請を送信
+    try {
+      const response = await fetch('/api/reservations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert('予約申請を受け付けました！');
+        console.log('予約申請結果:', result);
+      } else {
+        alert('予約申請の送信に失敗しました。');
+      }
+    } catch (error) {
+      console.error('予約申請エラー:', error);
+      alert('予約申請の送信に失敗しました。');
+    }
+  };
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">学生ログイン</h1>
+            <p className="text-gray-600">部活動の教室予約を申請</p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                部活動を選択
+              </label>
+              <select
+                value={selectedClub}
+                onChange={(e) => setSelectedClub(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+              >
+                <option value="">部活動を選択してください</option>
+                {clubs.map((club, index) => (
+                  <option key={index} value={club.name}>
+                    {club.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                パスワード
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+                placeholder="パスワードを入力"
+              />
+            </div>
+
+            <button
+              onClick={handleLogin}
+              className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors duration-200"
+            >
+              ログイン
+            </button>
+
+            <Link href="/" className="block text-center text-green-600 hover:text-green-700">
+              ホームに戻る
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800">教室予約申請フォーム</h1>
+            <p className="text-gray-600 mt-2">ログイン中: {selectedClub}</p>
+          </div>
+          <Link href="/" className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors duration-200">
+            ホームに戻る
+          </Link>
+        </div>
+
+        {/* 注意事項 */}
+        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-blue-800">教務からの注意事項</h3>
+              <div className="mt-2 text-sm text-blue-700">
+                <textarea
+                  className="w-full p-2 border border-blue-300 rounded-md bg-white text-gray-900"
+                  value={notice}
+                  onChange={(e) => setNotice(e.target.value)}
+                  rows={2}
+                  placeholder="注意事項を入力してください"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-blue-50 p-4 mb-6 rounded-lg">
+          <div className="text-blue-800 font-medium space-y-2">
+            <p>📢 予約システムの使い方：</p>
+            <ul className="list-disc list-inside text-sm space-y-1 ml-4">
+              <li>各日付で最大3つの教室予約が可能です</li>
+              <li>各予約について第5希望まで選択できます</li>
+              <li>予約数を選択後、各予約の希望順位をプルダウンで設定してください</li>
+              <li>設定完了後、画面下の「申込を完了」をクリックしてください</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* 週選択 */}
+        {reservationPeriod && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">📅 予約期間選択</h3>
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600">
+                予約可能期間: {reservationPeriod && (
+                  <>
+                    {reservationPeriod.reservationStartDate.getMonth() + 1}/{reservationPeriod.reservationStartDate.getDate()} 
+                    〜 
+                    {reservationPeriod.reservationEndDate.getMonth() + 1}/{reservationPeriod.reservationEndDate.getDate()}
+                  </>
+                )}
+              </p>
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => setSelectedWeek('first')}
+                  className={`px-4 py-2 rounded-md transition-colors duration-200 ${
+                    selectedWeek === 'first'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  前半週 ({reservationPeriod.firstWeek.startDate.getMonth() + 1}/{reservationPeriod.firstWeek.startDate.getDate()} 〜 {reservationPeriod.firstWeek.endDate.getMonth() + 1}/{reservationPeriod.firstWeek.endDate.getDate()})
+                </button>
+                <button
+                  onClick={() => setSelectedWeek('second')}
+                  className={`px-4 py-2 rounded-md transition-colors duration-200 ${
+                    selectedWeek === 'second'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  後半週 ({reservationPeriod.secondWeek.startDate.getMonth() + 1}/{reservationPeriod.secondWeek.startDate.getDate()} 〜 {reservationPeriod.secondWeek.endDate.getMonth() + 1}/{reservationPeriod.secondWeek.endDate.getDate()})
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 新しい予約システム：日付別希望入力 */}
+        <div className="space-y-6 mb-6">
+          {dates.map((date) => {
+            const dateReservation = dateReservations[date];
+            if (!dateReservation) return null;
+
+            return (
+              <div key={date} className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">{date}の予約</h3>
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm font-medium text-gray-700">予約数:</label>
+                    <select
+                      value={dateReservation.slotCount}
+                      onChange={(e) => updateSlotCount(date, parseInt(e.target.value))}
+                      className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+                    >
+                      <option value={1}>1つ</option>
+                      <option value={2}>2つ</option>
+                      <option value={3}>3つ</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {dateReservation.slots.map((slot, slotIndex) => (
+                    <div key={slotIndex} className="border border-gray-200 rounded-lg p-4">
+                      <h4 className="text-md font-medium text-gray-800 mb-3">
+                        予約 {slotIndex + 1}
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                        {slot.preferences.map((preference, prefIndex) => (
+                          <div key={prefIndex}>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              第{prefIndex + 1}希望
+                            </label>
+                                                         <select
+                               value={preference}
+                               onChange={(e) => updatePreference(date, slotIndex, prefIndex, e.target.value)}
+                               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+                             >
+                               <option value="">選択してください</option>
+                               {getAvailableClassroomOptions(date).map((option) => (
+                                 <option key={option.value} value={option.value}>
+                                   {option.label}
+                                 </option>
+                               ))}
+                             </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 抽選結果表示 */}
+                <div className="mt-4">
+                  <h5 className="text-sm font-medium text-gray-700 mb-2">この日の抽選結果</h5>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(allocationResults)
+                      .filter(([key]) => key.includes(date))
+                      .map(([key, result]) => {
+                        const [room] = key.split('_');
+                        return (
+                          <span
+                            key={key}
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              result === "当選"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800 line-through"
+                            }`}
+                          >
+                            {room}: {result}
+                          </span>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={submitSelection}
+          className="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 transition-colors duration-200 text-lg font-medium"
+        >
+          申込を完了
+        </button>
+
+        {/* 提出データ */}
+        {outputData && (
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">📦 提出データ（ペアに共有）</h2>
+            <pre className="bg-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
+              {outputData}
+            </pre>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

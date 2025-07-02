@@ -1,36 +1,122 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 教室予約システム
 
-## Getting Started
+`reservation_with_results.html`を参考にして作成された、部活動の教室予約を管理するWebアプリケーションです。
 
-First, run the development server:
+## 機能
 
+### 学生機能
+- 部活動ログイン（部活名とパスワード）
+- 教室予約申請フォーム
+- 抽選結果の表示（当選/落選）
+- 申請データのJSON出力
+
+### 教務機能
+- 教務ログイン（パスワード認証）
+- 教室一覧表示
+- 教室利用可否の変更
+- 予約申請の承認/却下
+- システム設定（注意事項、抽選設定）
+
+## 技術スタック
+
+- **フロントエンド**: Next.js 14, TypeScript, Tailwind CSS
+- **バックエンド**: Next.js API Routes
+- **UI**: モダンなレスポンシブデザイン
+
+## セットアップ
+
+### 前提条件
+- Node.js 18以上
+- npm または yarn
+
+### インストール
+
+1. プロジェクトディレクトリに移動
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd pbl_sample/webapp/frontend
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. 依存関係をインストール
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. 開発サーバーを起動
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. ブラウザで http://localhost:3000 にアクセス
 
-## Learn More
+## 使用方法
 
-To learn more about Next.js, take a look at the following resources:
+### 学生としてログイン
+1. ホームページで「学生ログイン」をクリック
+2. 部活動を選択（例：野球部）
+3. パスワードを入力（例：baseball）
+4. 教室予約申請フォームで希望する教室と日時を選択
+5. 「申込を完了」をクリック
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 教務としてログイン
+1. ホームページで「教務ログイン」をクリック
+2. パスワードを入力（admin）
+3. タブを切り替えて各種管理機能を使用
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## サンプルデータ
 
-## Deploy on Vercel
+### 部活動
+- 野球部 (パスワード: baseball)
+- サッカー部 (パスワード: soccer)
+- 軽音学部 (パスワード: lightmusic)
+- その他多数
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 教室
+- C101-C409: 各種講義室
+- 定員: 36-309人
+- 席タイプ: 固定席、セパレート席
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 教務
+- パスワード: admin
+
+## ファイル構成
+
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── classrooms/route.ts    # 教室データAPI
+│   │   ├── clubs/route.ts         # 部活データAPI
+│   │   └── reservations/route.ts  # 予約データAPI
+│   ├── pages/
+│   │   ├── student.tsx            # 学生用ページ
+│   │   └── admin.tsx              # 教務用ページ
+│   ├── globals.css                # グローバルスタイル
+│   ├── layout.tsx                 # レイアウト
+│   └── page.tsx                   # ホームページ
+```
+
+## 主な改善点
+
+元の`reservation_with_results.html`から以下の改善を行いました：
+
+1. **モダンなUI/UX**: Tailwind CSSを使用した美しいデザイン
+2. **レスポンシブ対応**: モバイル・タブレット・デスクトップ対応
+3. **型安全性**: TypeScriptによる型チェック
+4. **API連携**: Next.js API Routesによるバックエンド機能
+5. **状態管理**: React Hooksによる効率的な状態管理
+6. **エラーハンドリング**: 適切なエラー処理とユーザーフィードバック
+7. **セキュリティ**: パスワード認証の実装
+8. **拡張性**: モジュール化された構造で将来の機能追加に対応
+
+## 今後の拡張予定
+
+- データベース連携（PostgreSQL, MySQL等）
+- リアルタイム通知機能
+- 抽選アルゴリズムの実装
+- 予約履歴の管理
+- レポート機能
+- 管理者権限の細分化
+
+## ライセンス
+
+このプロジェクトは教育目的で作成されています。
