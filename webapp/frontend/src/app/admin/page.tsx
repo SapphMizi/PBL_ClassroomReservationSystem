@@ -2,128 +2,117 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import {
+  getCurrentReservationPeriod,
+  generateWeekDates,
+  debugPeriodInfo,
+  ReservationPeriod,
+  formatDateDisplay,
+  getToday,
+} from '../../utils/dateManager';
 
-interface Classroom {
+interface Room {
   name: string;
   capacity: number;
-  status: string;
-  available_per_day: Record<string, string>;
+  seatType: string;
 }
 
-interface ReservationRequest {
-  user: string;
-  selections: Array<{
-    room: string;
-    day: string;
-  }>;
-  timestamp: string;
-}
+const rooms: Room[] = [
+  { name: 'C101', capacity: 105, seatType: '固定' },
+  { name: 'C104', capacity: 52, seatType: 'セパ' },
+  { name: 'C105', capacity: 68, seatType: 'セパ' },
+  { name: 'C106', capacity: 102, seatType: 'セパ' },
+  { name: 'C202', capacity: 156, seatType: '固定' },
+  { name: 'C203', capacity: 73, seatType: '固定' },
+  { name: 'C204', capacity: 44, seatType: 'セパ' },
+  { name: 'C205', capacity: 60, seatType: '固定' },
+  { name: 'C206', capacity: 106, seatType: '固定' },
+  { name: 'C301', capacity: 105, seatType: '固定' },
+  { name: 'C302', capacity: 156, seatType: '固定' },
+  { name: 'C303', capacity: 72, seatType: '固定' },
+  { name: 'C304', capacity: 51, seatType: 'セパ' },
+  { name: 'C305', capacity: 54, seatType: '固定' },
+  { name: 'C306', capacity: 106, seatType: '固定' },
+  { name: 'C307', capacity: 72, seatType: '固定' },
+  { name: 'C308', capacity: 72, seatType: '固定' },
+  { name: 'C401', capacity: 105, seatType: '固定' },
+  { name: 'C402', capacity: 156, seatType: '固定' },
+  { name: 'C403', capacity: 72, seatType: '固定' },
+  { name: 'C404', capacity: 53, seatType: 'セパ' },
+  { name: 'C405', capacity: 54, seatType: '固定' },
+  { name: 'C406', capacity: 106, seatType: '固定' },
+  { name: 'C407', capacity: 36, seatType: 'セパ' },
+  { name: 'C408', capacity: 36, seatType: 'セパ' },
+  { name: 'C409', capacity: 36, seatType: 'セパ' },
+  { name: '講義室', capacity: 309, seatType: '固定' },
+];
+
+const statusOptions = ['使用可', '使用不可', '音出し不可', '抽選中', '予約済'];
 
 export default function AdminPage() {
-  const router = useRouter();
-  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [adminNote, setAdminNote] = useState<string>(
+    '例：C棟全体は6/22（土）音出し禁止です。',
+  );
+  const [roomStatus, setRoomStatus] = useState<Record<string, string>>({});
+  const [saveStatus, setSaveStatus] = useState<string>('');
+
+  // 抽選実行状態
+  const [lotteryStatus, setLotteryStatus] = useState<string>('');
+
+  // 日付管理
+  const [reservationPeriod, setReservationPeriod] =
+    useState<ReservationPeriod | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<'first' | 'second'>('first');
+  const [headers, setHeaders] = useState<string[]>([]);
+
+  // 開発用日付オーバーライド
+  const [overrideDate, setOverrideDate] = useState<string>(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('overrideToday') || '';
+    return '';
+  });
+
+  const applyOverrideDate = () => {
+    localStorage.setItem('overrideToday', overrideDate);
+    // リロードして期間再計算
+    window.location.reload();
+  };
+
+  // ログイン状態
   const [password, setPassword] = useState<string>('');
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'classrooms' | 'reservations' | 'settings'>('classrooms');
-  const [reservations, setReservations] = useState<ReservationRequest[]>([]);
-  const [selectedClassroom, setSelectedClassroom] = useState<string>('');
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [availability, setAvailability] = useState<string>('');
-
-  useEffect(() => {
-    fetchClassrooms();
-    fetchReservations();
-  }, []);
-
-  const fetchClassrooms = async () => {
-    try {
-      const response = await fetch('/api/classrooms');
-      const data = await response.json();
-      setClassrooms(data);
-    } catch (error) {
-      console.error('教室データの取得に失敗しました:', error);
-      // サンプルデータ
-      setClassrooms([
-        { name: "C101", capacity: 105, status: "固定", available_per_day: {} },
-        { name: "C104", capacity: 52, status: "セパ", available_per_day: {} },
-        { name: "C105", capacity: 68, status: "セパ", available_per_day: {} },
-        { name: "C106", capacity: 102, status: "セパ", available_per_day: {} },
-        { name: "C202", capacity: 156, status: "固定", available_per_day: {} },
-        { name: "C203", capacity: 73, status: "固定", available_per_day: {} },
-        { name: "C204", capacity: 44, status: "セパ", available_per_day: {} },
-        { name: "C205", capacity: 60, status: "固定", available_per_day: {} },
-        { name: "C206", capacity: 106, status: "固定", available_per_day: {} },
-        { name: "C301", capacity: 105, status: "固定", available_per_day: {} }
-      ]);
-    }
-  };
-
-  const fetchReservations = async () => {
-    try {
-      const response = await fetch('/api/reservations');
-      const data = await response.json();
-      setReservations(data);
-    } catch (error) {
-      console.error('予約データの取得に失敗しました:', error);
-      // サンプルデータ
-      setReservations([
-        {
-          user: "野球部",
-          selections: [
-            { room: "C101", day: "6/17" },
-            { room: "C202", day: "6/18" }
-          ],
-          timestamp: "2024-06-15T10:30:00Z" // 予約日時
-        },
-        {
-          user: "サッカー部",
-          selections: [
-            { room: "C105", day: "6/19" },
-            { room: "C203", day: "6/20" }
-          ],
-          timestamp: "2024-06-15T11:15:00Z"
-        }
-      ]);
-    }
-  };
 
   const handleLogin = () => {
     if (password === 'admin') {
       setIsLoggedIn(true);
-      // ログイン成功後、自動的に予約設定画面にリダイレクト
-      router.push('/admin/reservation');
     } else {
       alert('パスワードが間違っています。');
     }
   };
 
-  const updateClassroomAvailability = () => {
-    if (selectedClassroom && selectedDate && availability) {
-      setClassrooms(prev => prev.map(classroom => {
-        if (classroom.name === selectedClassroom) {
-          return {
-            ...classroom,
-            available_per_day: {
-              ...classroom.available_per_day,
-              [selectedDate]: availability
-            }
-          };
-        }
-        return classroom;
-      }));
-      
-      // フォームをリセット
-      setSelectedClassroom('');
-      setSelectedDate('');
-      setAvailability('');
-      
-      alert('教室の利用可否を更新しました。');
-    } else {
-      alert('すべての項目を入力してください。');
-    }
-  };
+  useEffect(() => {
+    const savedNote = localStorage.getItem('adminNote');
+    if (savedNote) setAdminNote(savedNote);
 
+    const savedStatus = localStorage.getItem('roomStatus');
+    if (savedStatus) setRoomStatus(JSON.parse(savedStatus));
+
+    const period = getCurrentReservationPeriod();
+    setReservationPeriod(period);
+    console.log('予約期間情報:', debugPeriodInfo(period));
+    setHeaders(generateWeekDates(period.firstWeek));
+  }, []);
+
+  useEffect(() => {
+    if (reservationPeriod) {
+      const weekPeriod =
+        selectedWeek === 'first'
+          ? reservationPeriod.firstWeek
+          : reservationPeriod.secondWeek;
+      setHeaders(generateWeekDates(weekPeriod));
+    }
+  }, [selectedWeek, reservationPeriod]);
+
+  // ログインしていない場合はログインフォームを表示
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -135,13 +124,14 @@ export default function AdminPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                パスワード
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">パスワード</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleLogin();
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                 placeholder="パスワードを入力"
               />
@@ -163,257 +153,248 @@ export default function AdminPage() {
     );
   }
 
+  const handleStatusChange = (room: string, day: number, status: string) => {
+    const actualDate = headers[day];
+    const key = `${room}_${actualDate}`;
+    setRoomStatus((prev) => ({ ...prev, [key]: status }));
+  };
+
+  const saveSettings = () => {
+    localStorage.setItem('adminNote', adminNote);
+    localStorage.setItem('roomStatus', JSON.stringify(roomStatus));
+    setSaveStatus('✅ 保存しました（学生画面に反映されます）');
+    setTimeout(() => setSaveStatus(''), 3000);
+  };
+
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case '使用不可':
+        return 'bg-red-100';
+      case '音出し不可':
+        return 'bg-yellow-100';
+      case '抽選中':
+        return 'bg-blue-100';
+      case '予約済':
+        return 'bg-green-100';
+      default:
+        return 'bg-white';
+    }
+  };
+
+  const canRunLottery = reservationPeriod && getToday() >= (reservationPeriod.announcementDate!);
+
+  async function runLottery() {
+    setLotteryStatus('抽選実行中...');
+    try {
+      const res = await fetch('/api/lottery', { method: 'POST' });
+      if (res.ok) {
+        setLotteryStatus('✅ 抽選完了');
+      } else {
+        setLotteryStatus('❌ 抽選失敗');
+      }
+    } catch (e) {
+      setLotteryStatus('❌ 抽選失敗');
+    }
+    setTimeout(() => setLotteryStatus(''), 4000);
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">教務管理画面</h1>
-            <p className="text-gray-600 mt-2">教室管理と予約承認</p>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-800">教務用：教室予約設定画面</h1>
           <div className="flex space-x-3">
-            <Link href="/admin/reservation" className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200">
-              予約設定画面
+            <Link
+              href="/lottery-results"
+              className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors duration-200"
+            >
+              抽選結果
             </Link>
-            <Link href="/" className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors duration-200">
+            <Link
+              href="/"
+              className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors duration-200"
+            >
               ホームに戻る
             </Link>
           </div>
         </div>
 
-        {/* タブナビゲーション */}
-        <div className="bg-white rounded-lg shadow-md mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 px-6">
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          {/* 週選択 */}
+          {reservationPeriod && (
+            <div className="mb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">📅 予約期間選択</h3>
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  予約可能期間:{' '}
+                  {reservationPeriod && (
+                    <>
+                      {reservationPeriod.reservationStartDate.getMonth() + 1}/
+                      {reservationPeriod.reservationStartDate.getDate()} 〜{' '}
+                      {reservationPeriod.reservationEndDate.getMonth() + 1}/
+                      {reservationPeriod.reservationEndDate.getDate()}
+                    </>
+                  )}
+                </p>
+                <div className="flex space-x-4">
               <button
-                onClick={() => setActiveTab('classrooms')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'classrooms'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    onClick={() => setSelectedWeek('first')}
+                    className={`px-4 py-2 rounded-md transition-colors duration-200 ${
+                      selectedWeek === 'first'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                教室管理
+                    前半週 (
+                    {reservationPeriod.firstWeek.startDate.getMonth() + 1}/
+                    {reservationPeriod.firstWeek.startDate.getDate()} 〜{' '}
+                    {reservationPeriod.firstWeek.endDate.getMonth() + 1}/
+                    {reservationPeriod.firstWeek.endDate.getDate()})
               </button>
               <button
-                onClick={() => setActiveTab('reservations')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'reservations'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    onClick={() => setSelectedWeek('second')}
+                    className={`px-4 py-2 rounded-md transition-colors duration-200 ${
+                      selectedWeek === 'second'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                予約申請
+                    後半週 (
+                    {reservationPeriod.secondWeek.startDate.getMonth() + 1}/
+                    {reservationPeriod.secondWeek.startDate.getDate()} 〜{' '}
+                    {reservationPeriod.secondWeek.endDate.getMonth() + 1}/
+                    {reservationPeriod.secondWeek.endDate.getDate()})
               </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 開発用: 日付オーバーライド */}
+          <div className="mb-6 p-4 border border-red-300 bg-red-50 rounded">
+            <h4 className="font-medium text-red-700 mb-2">開発者向け: 今日の日付を上書き</h4>
+            <div className="flex items-center space-x-2">
+              <input
+                type="date"
+                value={overrideDate}
+                onChange={(e) => setOverrideDate(e.target.value)}
+                className="border px-2 py-1 rounded text-gray-800 bg-white"
+              />
               <button
-                onClick={() => setActiveTab('settings')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'settings'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                onClick={applyOverrideDate}
+                className="bg-red-600 text-white px-3 py-1 rounded"
               >
-                設定
+                適用
               </button>
-            </nav>
+              <span className="text-xs text-red-600">※ ブラウザの localStorage に保存され、ページ再読み込み後に有効</span>
+            </div>
           </div>
+
+          {/* 注意文設定 */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              📢 学生に表示される注意文を入力：
+            </label>
+            <textarea
+              value={adminNote}
+              onChange={(e) => setAdminNote(e.target.value)}
+              className="w-full h-16 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              placeholder="例：C棟全体は6/22（土）音出し禁止です。"
+            />
         </div>
 
-        {/* 教室管理タブ */}
-        {activeTab === 'classrooms' && (
-          <div className="space-y-6">
-            {/* 教室一覧 */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">教室一覧</h2>
+          {/* 予約テーブル */}
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        教室名
+            <table className="w-full border-collapse border border-gray-300">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border border-gray-300 px-2 py-2 text-sm font-medium text-gray-800">
+                    講義室
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="border border-gray-300 px-2 py-2 text-sm font-medium text-gray-800">
                         定員
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        席タイプ
+                  <th className="border border-gray-300 px-2 py-2 text-sm font-medium text-gray-800">
+                    席
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        ステータス
+                  {headers.map((header, index) => (
+                    <th
+                      key={index}
+                      className="border border-gray-300 px-2 py-2 text-sm font-medium text-gray-800"
+                    >
+                      {header}
                       </th>
+                  ))}
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {classrooms.map((classroom, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {classroom.name}
+              <tbody>
+                {rooms.map((room) => (
+                  <tr key={room.name}>
+                    <td className="border border-gray-300 px-2 py-2 text-sm text-center text-gray-800">
+                      {room.name}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {classroom.capacity}人
+                    <td className="border border-gray-300 px-2 py-2 text-sm text-center text-gray-800">
+                      {room.capacity}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {classroom.status}
+                    <td className="border border-gray-300 px-2 py-2 text-sm text-center text-gray-800">
+                      {room.seatType}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                            利用可能
-                          </span>
+                    {[0, 1, 2, 3, 4, 5, 6].map((day) => {
+                      const actualDate = headers[day];
+                      const key = `${room.name}_${actualDate}`;
+                      const status = roomStatus[key] || '使用可';
+                      return (
+                        <td
+                          key={day}
+                          className={`border border-gray-300 px-1 py-1 text-center ${getStatusColor(status)}`}
+                        >
+                          <select
+                            value={status}
+                            onChange={(e) =>
+                              handleStatusChange(room.name, day, e.target.value)
+                            }
+                            className="w-full text-xs bg-transparent border-none outline-none text-gray-800"
+                          >
+                            {statusOptions.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
                         </td>
+                      );
+                    })}
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
             </div>
 
-            {/* 教室利用可否変更 */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">教室利用可否変更</h2>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    教室を選択
-                  </label>
-                  <select
-                    value={selectedClassroom}
-                    onChange={(e) => setSelectedClassroom(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  >
-                    <option value="">教室を選択</option>
-                    {classrooms.map((classroom, index) => (
-                      <option key={index} value={classroom.name}>
-                        {classroom.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          {/* 保存ボタン */}
+          <div className="mt-6 flex items-center space-x-4">
+            <button
+              onClick={saveSettings}
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200"
+            >
+              変更を保存
+            </button>
+            {saveStatus && (
+              <div className="text-green-600 font-medium">{saveStatus}</div>
+            )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    日付
-                  </label>
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    利用可否
-                  </label>
-                  <select
-                    value={availability}
-                    onChange={(e) => setAvailability(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  >
-                    <option value="">選択してください</option>
-                    <option value="利用可">利用可</option>
-                    <option value="利用不可">利用不可</option>
-                  </select>
-                </div>
-
-                <div className="flex items-end">
-                  <button
-                    onClick={updateClassroomAvailability}
-                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200"
-                  >
-                    更新
-                  </button>
-                </div>
-              </div>
-            </div>
+            {/* 抽選ボタン */}
+            {reservationPeriod && (
+              <button
+                onClick={runLottery}
+                disabled={!canRunLottery}
+                className={`${canRunLottery ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-400 cursor-not-allowed'} text-white px-6 py-2 rounded-md transition-colors duration-200`}
+              >
+                抽選を実行
+              </button>
+            )}
+            {lotteryStatus && <span className="text-purple-700 text-sm">{lotteryStatus}</span>}
           </div>
-        )}
-
-        {/* 予約申請タブ */}
-        {activeTab === 'reservations' && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">予約申請一覧</h2>
-            <div className="space-y-4">
-              {reservations.map((reservation, index) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900">{reservation.user}</h3>
-                      <p className="text-sm text-gray-500">
-                        申請日時: {new Date(reservation.timestamp).toLocaleString('ja-JP')}
-                      </p>
-                    </div>
-                    <div className="flex space-x-2">
-                      <button className="bg-green-600 text-white px-3 py-1 rounded-md text-sm hover:bg-green-700">
-                        承認
-                      </button>
-                      <button className="bg-red-600 text-white px-3 py-1 rounded-md text-sm hover:bg-red-700">
-                        却下
-                      </button>
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 rounded-md p-3">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">申請内容:</h4>
-                    <ul className="space-y-1">
-                      {reservation.selections.map((selection, selIndex) => (
-                        <li key={selIndex} className="text-sm text-gray-600">
-                          • {selection.room} - {selection.day}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
-        )}
-
-        {/* 設定タブ */}
-        {activeTab === 'settings' && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">システム設定</h2>
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-3">注意事項設定</h3>
-                <textarea
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  rows={4}
-                  placeholder="学生向けの注意事項を入力してください"
-                />
-                <button className="mt-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200">
-                  更新
-                </button>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-3">抽選設定</h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      抽選開始日時
-                    </label>
-                    <input
-                      type="datetime-local"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      抽選終了日時
-                    </label>
-                    <input
-                      type="datetime-local"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                    />
-                  </div>
-                  <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200">
-                    抽選実行
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

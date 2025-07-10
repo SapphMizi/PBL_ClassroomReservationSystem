@@ -1,3 +1,4 @@
+// cd pbl_sample/webapp/frontend
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -62,6 +63,18 @@ export default function StudentPage() {
   const [selectedWeek, setSelectedWeek] = useState<'first' | 'second'>('first');
   const [dates, setDates] = useState<string[]>([]);
 
+  // adminNote を読み込み
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('adminNote');
+      if (saved) {
+        setNotice(saved);
+      }
+    } catch (e) {
+      console.error('adminNote の読み込みに失敗しました', e);
+    }
+  }, []);
+
   useEffect(() => {
     fetchClassrooms();
     fetchClubs();
@@ -100,17 +113,20 @@ export default function StudentPage() {
       setDates(newDates);
       
       // 新しい日付に対応する予約データを初期化
-      const initialReservations: Record<string, DateReservation> = {};
-      newDates.forEach(date => {
-        initialReservations[date] = {
-          date,
-          slotCount: 1, // デフォルトは1つの予約スロット
-          slots: [{
-            preferences: ['', '', '', '', ''] // 第1〜5希望（初期は空）
-          }]
-        };
+      // 既存の予約データを保持しつつ、新しい日付だけ初期化
+      setDateReservations(prev => {
+        const updated: Record<string, DateReservation> = { ...prev };
+        newDates.forEach(date => {
+          if (!updated[date]) {
+            updated[date] = {
+              date,
+              slotCount: 1,
+              slots: [{ preferences: ['', '', '', '', ''] }]
+            };
+          }
+        });
+        return updated;
       });
-      setDateReservations(initialReservations);
     }
   }, [selectedWeek, reservationPeriod]);
 
@@ -296,6 +312,13 @@ export default function StudentPage() {
         const result = await response.json();
         alert('予約申請を受け付けました！');
         console.log('予約申請結果:', result);
+
+        // ローカルストレージに保存
+        try {
+          localStorage.setItem(`studentReservations_${selectedClub}`, JSON.stringify(dateReservations));
+        } catch (e) {
+          console.error('ローカルストレージへの保存に失敗しました', e);
+        }
       } else {
         alert('予約申請の送信に失敗しました。');
       }
@@ -304,6 +327,22 @@ export default function StudentPage() {
       alert('予約申請の送信に失敗しました。');
     }
   };
+
+  // ログイン後に保存済みの予約データを読み込む
+  useEffect(() => {
+    if (isLoggedIn) {
+      try {
+        const saved = localStorage.getItem(`studentReservations_${selectedClub}`);
+        if (saved) {
+          const parsed: Record<string, DateReservation> = JSON.parse(saved);
+          // 現行の dateReservations とマージ（現在期間の日付についてのみ更新）
+          setDateReservations(prev => ({ ...prev, ...parsed }));
+        }
+      } catch (e) {
+        console.error('ローカルストレージからの読み込みに失敗しました', e);
+      }
+    }
+  }, [isLoggedIn, selectedClub]);
 
   if (!isLoggedIn) {
     return (
@@ -341,6 +380,11 @@ export default function StudentPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleLogin();
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
                 placeholder="パスワードを入力"
               />
@@ -370,9 +414,14 @@ export default function StudentPage() {
             <h1 className="text-3xl font-bold text-gray-800">教室予約申請フォーム</h1>
             <p className="text-gray-600 mt-2">ログイン中: {selectedClub}</p>
           </div>
+          <div className="flex space-x-3">
+            <Link href="/lottery-results" className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors duration-200">
+              抽選結果
+            </Link>
           <Link href="/" className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors duration-200">
             ホームに戻る
           </Link>
+          </div>
         </div>
 
         {/* 注意事項 */}
@@ -386,13 +435,9 @@ export default function StudentPage() {
             <div className="ml-3">
               <h3 className="text-sm font-medium text-blue-800">教務からの注意事項</h3>
               <div className="mt-2 text-sm text-blue-700">
-                <textarea
-                  className="w-full p-2 border border-blue-300 rounded-md bg-white text-gray-900"
-                  value={notice}
-                  onChange={(e) => setNotice(e.target.value)}
-                  rows={2}
-                  placeholder="注意事項を入力してください"
-                />
+                <p className="w-full whitespace-pre-line text-blue-700">
+                  {notice}
+                </p>
               </div>
             </div>
           </div>
@@ -459,7 +504,19 @@ export default function StudentPage() {
             return (
               <div key={date} className="bg-white rounded-lg shadow-md p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">{date}の予約</h3>
+                  {(() => {
+                    const isDone = dateReservation.slots.some(slot => slot.preferences.some(pref => pref !== ''));
+                    return (
+                      <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                        {date}の予約
+                        {isDone && (
+                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            済
+                          </span>
+                        )}
+                      </h3>
+                    );
+                  })()}
                   <div className="flex items-center space-x-2">
                     <label className="text-sm font-medium text-gray-700">予約数:</label>
                     <select
