@@ -30,6 +30,7 @@ export async function GET() {
     const allClubs = await prisma.club.findMany();
     return NextResponse.json(allClubs);
   } catch (error) {
+    console.error(error);
     return NextResponse.json(
       { error: '部活データの取得に失敗しました' },
       { status: 500 }
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ message: '部活を追加しました', club: created });
   } catch (error) {
+    console.error(error);
     return NextResponse.json(
       { error: '部活データの追加に失敗しました' },
       { status: 500 }

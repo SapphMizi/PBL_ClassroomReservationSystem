@@ -100,7 +100,7 @@ export function getCurrentReservationPeriod(): ReservationPeriod {
   const today = getToday();
 
   // 基準日(最初の月曜)を6月30日に設定
-  let baseDate = new Date(today.getFullYear(), 5, 30);
+  const baseDate = new Date(today.getFullYear(), 5, 30);
 
   // 目的: "次回" の予約期間を返す (予約開始日が今日より後)
   let period = calculateReservationPeriod(baseDate);

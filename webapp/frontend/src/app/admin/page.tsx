@@ -7,7 +7,6 @@ import {
   generateWeekDates,
   debugPeriodInfo,
   ReservationPeriod,
-  formatDateDisplay,
   getToday,
 } from '../../utils/dateManager';
 
@@ -193,6 +192,7 @@ export default function AdminPage() {
         setLotteryStatus('❌ 抽選失敗');
       }
     } catch (e) {
+      console.error(e);
       setLotteryStatus('❌ 抽選失敗');
     }
     setTimeout(() => setLotteryStatus(''), 4000);

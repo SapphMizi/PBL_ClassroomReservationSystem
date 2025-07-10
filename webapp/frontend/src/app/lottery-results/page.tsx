@@ -3,13 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-interface AllocationMap {
-  [room: string]: string | null;
-}
-
 interface LotteryHistoryEntry {
   executedAt: string;
-  allocations: Record<string, any>; // day -> {room:club}
+  allocations: Record<string, Record<string, string>>; // day -> { room: club }
 }
 
 export default function LotteryResultsPage() {
@@ -62,7 +58,7 @@ export default function LotteryResultsPage() {
         )}
 
         {recent.map((entry, index) => {
-          const byDay = entry.allocations as Record<string, Record<string, string>>;
+          const byDay = entry.allocations;
           return (
             <div key={index} className="bg-white rounded-lg shadow-md p-6 mb-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
