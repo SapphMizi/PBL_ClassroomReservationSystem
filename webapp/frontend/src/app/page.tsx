@@ -23,6 +23,18 @@ export default function Home() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [notice, setNotice] = useState<string>('例：C棟全体は6/22（土）音出し禁止です。');
 
+  // 初期ロード時に adminNote を取得
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('adminNote');
+      if (saved) {
+        setNotice(saved);
+      }
+    } catch (e) {
+      console.error('adminNote の読み込みに失敗しました', e);
+    }
+  }, []);
+
   useEffect(() => {
     // 実際のAPIからデータを取得する処理
     fetchClassrooms();
@@ -74,13 +86,9 @@ export default function Home() {
                 教務からの注意事項
               </h3>
               <div className="mt-2 text-sm text-blue-700">
-                <textarea
-                  className="w-full p-2 border border-blue-300 rounded-md bg-white text-gray-900"
-                  value={notice}
-                  onChange={(e) => setNotice(e.target.value)}
-                  rows={2}
-                  placeholder="注意事項を入力してください"
-                />
+                <p className="w-full whitespace-pre-line text-blue-700">
+                  {notice}
+                </p>
               </div>
             </div>
           </div>
@@ -164,6 +172,25 @@ export default function Home() {
                     教務ログイン
                   </h3>
                   <p className="text-gray-600">教室管理と予約承認</p>
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          {/* 抽選結果ページへのリンク */}
+          <Link href="/lottery-results" className="group md:col-span-2">
+            <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow duration-200">
+              <div className="flex items-center">
+                <div className="p-3 bg-purple-100 rounded-full group-hover:bg-purple-200 transition-colors duration-200">
+                  <svg className="h-8 w-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-purple-600 transition-colors duration-200">
+                    抽選結果一覧
+                  </h3>
+                  <p className="text-gray-600">直近2期間の抽選結果を確認</p>
                 </div>
               </div>
             </div>

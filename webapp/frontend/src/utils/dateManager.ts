@@ -11,6 +11,10 @@ export interface ReservationPeriod {
   baseDate: Date;
   reservationStartDate: Date;
   reservationEndDate: Date;
+  /** 予約締切日 (開始日から10日目) */
+  closingDate?: Date;
+  /** 抽選結果発表日 (締切日の翌日) */
+  announcementDate?: Date;
   firstWeek: WeekPeriod;
   secondWeek: WeekPeriod;
 }
@@ -38,11 +42,20 @@ export function calculateReservationPeriod(baseDate: Date): ReservationPeriod {
   const secondWeekStart = new Date(reservationStartDate);
   secondWeekStart.setDate(reservationStartDate.getDate() + 7);
   const secondWeekEnd = new Date(reservationEndDate);
+
+  // 締切日: 予約開始日 + 9日 (0-index)
+  const closingDate = new Date(baseDate);
+  closingDate.setDate(baseDate.getDate() + 10); // オープンから10日目に締切
+
+  const announcementDate = new Date(baseDate);
+  announcementDate.setDate(baseDate.getDate() + 11); // 翌日に抽選発表
   
   return {
     baseDate,
     reservationStartDate,
     reservationEndDate,
+    closingDate,
+    announcementDate,
     firstWeek: {
       startDate: firstWeekStart,
       endDate: firstWeekEnd,
@@ -59,25 +72,44 @@ export function calculateReservationPeriod(baseDate: Date): ReservationPeriod {
 }
 
 /**
+ * 今日の日付を取得（開発用オーバーライド対応）
+ * 1. ブラウザ側 localStorage の `overrideToday`
+ * 2. NEXT_PUBLIC_OVERRIDE_DATE 環境変数
+ * が設定されていればそれを優先して返す
+ */
+export function getToday(): Date {
+  // ブラウザ
+  if (typeof window !== 'undefined') {
+    try {
+      const ls = localStorage.getItem('overrideToday');
+      if (ls) return new Date(ls);
+    } catch {}
+  }
+  // 環境変数
+  if (process.env.NEXT_PUBLIC_OVERRIDE_DATE) {
+    return new Date(process.env.NEXT_PUBLIC_OVERRIDE_DATE);
+  }
+  return new Date();
+}
+
+/**
  * 現在の日付に基づいて適切な予約期間を取得する
  * @returns 現在有効な予約期間
  */
 export function getCurrentReservationPeriod(): ReservationPeriod {
-  const today = new Date();
-  
-  // 基準日を6月30日に設定（年は現在の年を使用）
-  let baseDate = new Date(today.getFullYear(), 5, 30); // 月は0ベースなので5=6月
-  
-  // 最初の予約期間を計算
+  const today = getToday();
+
+  // 基準日(最初の月曜)を6月30日に設定
+  let baseDate = new Date(today.getFullYear(), 5, 30);
+
+  // 目的: "次回" の予約期間を返す (予約開始日が今日より後)
   let period = calculateReservationPeriod(baseDate);
-  
-  // 現在の日付が予約期間を過ぎている場合、次の期間を計算
-  while (today > period.reservationEndDate) {
-    baseDate = new Date(period.reservationEndDate);
-    baseDate.setDate(baseDate.getDate() + 1); // 次の日を新しい基準日とする
+  while (today >= period.reservationStartDate) {
+    // 次の基準日 = 現在の baseDate + 14 日
+    baseDate.setDate(baseDate.getDate() + 14);
     period = calculateReservationPeriod(baseDate);
   }
-  
+
   return period;
 }
 

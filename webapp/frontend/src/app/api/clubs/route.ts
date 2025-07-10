@@ -1,27 +1,34 @@
 import { NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
 
-interface Club {
-  name: string;
-  password: string;
+const prisma = new PrismaClient();
+
+// 初回アクセス時、DB が空ならサンプルデータを投入
+async function ensureSeed() {
+  const count = await prisma.club.count();
+  if (count === 0) {
+    await prisma.club.createMany({
+      data: [
+        { name: '野球部', password: 'baseball', points: 0 },
+        { name: 'サッカー部', password: 'soccer', points: 0 },
+        { name: '軽音学部', password: 'lightmusic', points: 0 },
+        { name: 'バスケットボール部', password: 'basketball', points: 0 },
+        { name: 'テニス部', password: 'tennis', points: 0 },
+        { name: '卓球部', password: 'pingpong', points: 0 },
+        { name: '吹奏楽部', password: 'band', points: 0 },
+        { name: '美術部', password: 'art', points: 0 },
+        { name: '写真部', password: 'photo', points: 0 },
+        { name: '科学部', password: 'science', points: 0 },
+      ],
+    });
+  }
 }
-
-// サンプルデータ（実際のシステムではデータベースから取得）
-const clubs: Club[] = [
-  { name: "野球部", password: "baseball" },
-  { name: "サッカー部", password: "soccer" },
-  { name: "軽音学部", password: "lightmusic" },
-  { name: "バスケットボール部", password: "basketball" },
-  { name: "テニス部", password: "tennis" },
-  { name: "卓球部", password: "pingpong" },
-  { name: "吹奏楽部", password: "band" },
-  { name: "美術部", password: "art" },
-  { name: "写真部", password: "photo" },
-  { name: "科学部", password: "science" }
-];
 
 export async function GET() {
   try {
-    return NextResponse.json(clubs);
+    await ensureSeed();
+    const allClubs = await prisma.club.findMany();
+    return NextResponse.json(allClubs);
   } catch (error) {
     return NextResponse.json(
       { error: '部活データの取得に失敗しました' },
@@ -35,10 +42,11 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { name, password } = body;
 
-    // 実際のシステムではデータベースに保存
-    console.log(`新しい部活を追加: ${name}`);
+    const created = await prisma.club.create({
+      data: { name, password },
+    });
 
-    return NextResponse.json({ message: '部活を追加しました' });
+    return NextResponse.json({ message: '部活を追加しました', club: created });
   } catch (error) {
     return NextResponse.json(
       { error: '部活データの追加に失敗しました' },
