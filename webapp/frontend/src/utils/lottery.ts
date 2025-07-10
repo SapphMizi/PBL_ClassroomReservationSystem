@@ -55,7 +55,10 @@ function extractClubPreferences(
     if (!map[club]) map[club] = [];
 
     // 型を簡易判定
-    const firstSel: any = r.selections[0];
+    const firstSel = r.selections[0] as
+      | ReservationRequestLegacy['selections'][number]
+      | ReservationRequestV2['selections'][number]
+      | undefined;
     if (firstSel && 'room' in firstSel) {
       // レガシー形式
       (r as ReservationRequestLegacy).selections.forEach((sel) => {

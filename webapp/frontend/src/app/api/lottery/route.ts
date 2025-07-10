@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { performLottery, AllocationMap, ReservationRequestV2 } from '../../../utils/lottery';
+import { performLottery, ReservationRequestV2 } from '../../../utils/lottery';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -14,12 +14,12 @@ export async function POST() {
     // reservations を performLottery 用フォーマットに変換
     const resData: ReservationRequestV2[] = reservations.map((r) => ({
       user: r.club.name,
-      selections: r.data as any,
+      selections: r.data as ReservationRequestV2['selections'],
       timestamp: r.createdAt.toISOString(),
     }));
 
     const result = performLottery(
-      resData as any,
+      resData,
       clubs.map((c) => ({ name: c.name, points: c.points })),
       classrooms.map((c) => ({ name: c.name }))
     );
@@ -50,6 +50,7 @@ export async function POST() {
 
     return NextResponse.json({ message: '抽選を実行しました', allocations: allocationsPerDay });
   } catch (e) {
+    console.error(e);
     console.error('Lottery error', e);
     return NextResponse.json(
       { error: '抽選処理に失敗しました' },
@@ -63,6 +64,7 @@ export async function GET() {
     const history = await prisma.lotteryHistory.findMany({ orderBy: { executedAt: 'desc' }, take: 10 });
     return NextResponse.json({ history });
   } catch (e) {
+    console.error(e);
     return NextResponse.json({ error: '取得失敗' }, { status: 500 });
   }
 } 

@@ -46,6 +46,7 @@ export async function GET() {
     const allRooms = await prisma.classroom.findMany();
     return NextResponse.json(allRooms);
   } catch (error) {
+    console.error(error);
     return NextResponse.json(
       { error: '教室データの取得に失敗しました' },
       { status: 500 }
@@ -63,7 +64,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: '教室が見つかりません' }, { status: 404 });
     }
 
-    const current = (room.availablePerDay as any) ?? {};
+    const current: Record<string, boolean> = (room.availablePerDay as Record<string, boolean> | null) ?? {};
     current[date] = available;
 
     await prisma.classroom.update({
@@ -73,6 +74,7 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({ message: '更新しました' });
   } catch (error) {
+    console.error(error);
     return NextResponse.json(
       { error: '教室データの更新に失敗しました' },
       { status: 500 }
