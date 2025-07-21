@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 
 interface LotteryHistoryEntry {
   executedAt: string;
@@ -29,7 +32,7 @@ export default function LotteryResultsPage() {
     fetchData();
   }, []);
 
-  const recent = history.slice(0, 2);
+  const recent = history.slice(0, 5);
 
   if (loading) {
     return (
@@ -44,53 +47,62 @@ export default function LotteryResultsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-fuchsia-100">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-fuchsia-100 dark:from-slate-800 dark:to-slate-900">
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">直近 2 期間の抽選結果</h1>
-          <Link href="/" className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors duration-200">
-            ホームに戻る
-          </Link>
+          <h1 className="text-3xl font-bold text-foreground">直近の抽選結果</h1>
+          <Button asChild className="bg-slate-600 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600">
+            <Link href="/">ホームに戻る</Link>
+          </Button>
         </div>
 
         {recent.length === 0 && (
-          <p className="text-gray-700">まだ抽選結果がありません。</p>
+          <p className="text-muted-foreground">まだ抽選結果がありません。</p>
         )}
 
-        {recent.map((entry, index) => {
+        <Accordion type="single" collapsible className="space-y-4">
+          {recent.map((entry) => {
           const byDay = entry.allocations;
+            const id = entry.executedAt;
           return (
-            <div key={index} className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                抽選実行日時: {new Date(entry.executedAt).toLocaleString('ja-JP')}
-              </h2>
-              {Object.entries(byDay).map(([day, rooms]) => {
-                if (typeof rooms !== 'object' || rooms === null) return null;
-                return (
-                  <div key={day} className="mb-4">
-                    <h3 className="font-medium text-gray-800 mb-2">{day}</h3>
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-gray-600">教室</th>
-                          <th className="px-4 py-2 text-left text-gray-600">部活</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(rooms as Record<string, string>).map(([room, club]) => (
-                          <tr key={room} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 font-medium text-gray-900">{room}</td>
-                            <td className="px-4 py-2 text-gray-700">{club}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              })}
-            </div>
+              <AccordionItem value={id} key={id}>
+                <AccordionTrigger>
+                  {new Date(entry.executedAt).toLocaleString('ja-JP')}
+                </AccordionTrigger>
+                <AccordionContent>
+                  <Card className="mt-2 bg-card dark:bg-card">
+                    <CardContent className="space-y-6 py-4">
+                {Object.entries(byDay).map(([day, rooms]) => {
+                  if (typeof rooms !== 'object' || rooms === null) return null;
+                  const entries = Object.entries(rooms as Record<string, string>);
+                  return (
+                          <div key={day} className="border border-muted rounded-lg overflow-hidden">
+                      <div className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300 px-4 py-2 text-sm font-semibold">
+                        {day}
+                      </div>
+                            <div className="grid grid-cols-2 bg-muted dark:bg-slate-700/50 text-muted-foreground text-xs font-semibold uppercase">
+                        <div className="px-4 py-2">教室</div>
+                        <div className="px-4 py-2">部活</div>
+                      </div>
+                      {entries.map(([room, club], idx) => (
+                        <div
+                                key={room}
+                          className={`grid grid-cols-2 px-4 py-2 ${idx % 2 === 0 ? 'bg-background dark:bg-slate-800/30' : 'bg-muted dark:bg-slate-700/30'}`}
+                        >
+                          <div className="font-medium text-foreground">{room}</div>
+                          <div className="text-foreground">{club}</div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+                    </CardContent>
+                  </Card>
+                </AccordionContent>
+              </AccordionItem>
           );
         })}
+        </Accordion>
       </div>
     </div>
   );

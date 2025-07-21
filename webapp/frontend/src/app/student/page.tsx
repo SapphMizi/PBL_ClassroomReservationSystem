@@ -2,6 +2,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
 import { 
   getCurrentReservationPeriod, 
@@ -9,6 +13,7 @@ import {
   debugPeriodInfo,
   ReservationPeriod
 } from '../../utils/dateManager';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 interface Classroom {
   name: string;
@@ -23,7 +28,7 @@ interface Club {
 }
 
 interface ReservationSlot {
-  preferences: string[]; // 第1〜5希望の教室名
+  preferences: string[]; // 第1〜3希望の教室名
 }
 
 interface DateReservation {
@@ -37,11 +42,14 @@ interface ReservationRequest {
   selections: Array<{
     day: string;
     reservations: Array<{
-      preferences: string[]; // 第1〜5希望
+      preferences: string[]; // 第1〜3希望
     }>;
   }>;
   timestamp: string;
 }
+
+// 最大希望数
+const MAX_PREFS = 3;
 
 export default function StudentPage() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
@@ -121,7 +129,7 @@ export default function StudentPage() {
             updated[date] = {
               date,
               slotCount: 1,
-              slots: [{ preferences: ['', '', '', '', ''] }]
+              slots: [{ preferences: Array(MAX_PREFS).fill('') }]
             };
           }
         });
@@ -201,12 +209,14 @@ export default function StudentPage() {
       const existing = prev[date] || {
         date,
         slotCount: 1,
-        slots: [{ preferences: ['', '', '', '', ''] }]
+        slots: [{ preferences: Array(MAX_PREFS).fill('') }]
       };
       
-      const newSlots = Array.from({ length: count }, (_, index) => 
-        existing.slots[index] || { preferences: ['', '', '', '', ''] }
-      );
+      const newSlots = Array.from({ length: count }, (_, index) => {
+        const base = existing.slots[index] || { preferences: [] };
+        const prefs = Array.from({ length: MAX_PREFS }, (_, i) => base.preferences[i] || '');
+        return { preferences: prefs };
+      });
       
       return {
         ...prev,
@@ -227,6 +237,10 @@ export default function StudentPage() {
       
       const newSlots = [...existing.slots];
       const newPreferences = [...newSlots[slotIndex].preferences];
+      // 必ず MAX_PREFS 個に揃える
+      if (newPreferences.length < MAX_PREFS) {
+        newPreferences.push(...Array(MAX_PREFS - newPreferences.length).fill(''));
+      }
       newPreferences[preferenceIndex] = classroom;
       newSlots[slotIndex] = { preferences: newPreferences };
       
@@ -246,10 +260,28 @@ export default function StudentPage() {
     return roomStatus[key] || '使用可';
   };
 
+  // 指定日付で既に選択されている教室を取得
+  const getSelectedClassroomsForDate = (date: string): Set<string> => {
+    const set = new Set<string>();
+    const dateRes = dateReservations[date];
+    if (!dateRes) return set;
+    dateRes.slots.forEach(slot => {
+      slot.preferences.forEach(pref => {
+        if (pref) set.add(pref);
+      });
+    });
+    return set;
+  };
+
   // 特定の日付で利用可能な教室の選択肢を生成する関数
-  const getAvailableClassroomOptions = (date: string): Array<{value: string, label: string, classroom: Classroom}> => {
+  const getAvailableClassroomOptions = (
+    date: string,
+    currentValue: string
+  ): Array<{ value: string; label: string; classroom: Classroom }> => {
+    const selectedSet = getSelectedClassroomsForDate(date);
+
     return classrooms
-      .map(classroom => {
+      .map((classroom) => {
         const availability = getClassroomAvailability(classroom.name, date);
         
         // 利用不可の場合は除外
@@ -257,7 +289,12 @@ export default function StudentPage() {
           return null;
         }
         
-        // 音出し禁止の場合は追記
+        // 既に他で選択されている場合は除外（ただし現在値は残す）
+        if (selectedSet.has(classroom.name) && classroom.name !== currentValue) {
+          return null;
+        }
+
+        // 音出し禁止等のラベル
         let displayName = `${classroom.name} (${classroom.capacity}人・${classroom.status})`;
         if (availability === '音出し不可') {
           displayName += ' ※音出し禁止';
@@ -270,10 +307,14 @@ export default function StudentPage() {
         return {
           value: classroom.name,
           label: displayName,
-          classroom: classroom
+          classroom: classroom,
         };
       })
-      .filter((option): option is {value: string, label: string, classroom: Classroom} => option !== null);
+      .filter(
+        (
+          option
+        ): option is { value: string; label: string; classroom: Classroom } => option !== null
+      );
   };
 
   const submitSelection = async () => {
@@ -346,10 +387,10 @@ export default function StudentPage() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center">
+        <div className="bg-card rounded-lg shadow-lg p-8 w-full max-w-md">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">学生ログイン</h1>
+            <h1 className="text-2xl font-bold text-foreground mb-2">学生ログイン</h1>
             <p className="text-gray-600">部活動の教室予約を申請</p>
           </div>
 
@@ -358,44 +399,38 @@ export default function StudentPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 部活動を選択
               </label>
-              <select
-                value={selectedClub}
-                onChange={(e) => setSelectedClub(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
-              >
-                <option value="">部活動を選択してください</option>
-                {clubs.map((club, index) => (
-                  <option key={index} value={club.name}>
+              <Select value={selectedClub} onValueChange={setSelectedClub}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="部活動を選択してください" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clubs.map((club) => (
+                    <SelectItem key={club.name} value={club.name}>
                     {club.name}
-                  </option>
+                    </SelectItem>
                 ))}
-              </select>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 パスワード
               </label>
-              <input
+              <Input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleLogin();
-                  }
+                  if (e.key === 'Enter') handleLogin();
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
                 placeholder="パスワードを入力"
               />
             </div>
 
-            <button
-              onClick={handleLogin}
-              className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors duration-200"
-            >
+            <Button className="w-full bg-green-600 hover:bg-green-700" onClick={handleLogin}>
               ログイン
-            </button>
+            </Button>
 
             <Link href="/" className="block text-center text-green-600 hover:text-green-700">
               ホームに戻る
@@ -407,15 +442,15 @@ export default function StudentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 dark:from-slate-800 dark:to-slate-900">
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">教室予約申請フォーム</h1>
-            <p className="text-gray-600 mt-2">ログイン中: {selectedClub}</p>
+            <p className="text-muted-foreground mt-2">ログイン中: {selectedClub}</p>
           </div>
           <div className="flex space-x-3">
-            <Link href="/lottery-results" className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors duration-200">
+            <Link href="/lottery-results" target="_blank" rel="noopener noreferrer" className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors duration-200">
               抽選結果
             </Link>
           <Link href="/" className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors duration-200">
@@ -425,7 +460,7 @@ export default function StudentPage() {
         </div>
 
         {/* 注意事項 */}
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+        <div className="bg-muted dark:bg-slate-700/60 border-l-4 border-blue-400 dark:border-slate-600 p-4 mb-6">
           <div className="flex">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
@@ -433,9 +468,9 @@ export default function StudentPage() {
               </svg>
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">教務からの注意事項</h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <p className="w-full whitespace-pre-line text-blue-700">
+              <h3 className="text-sm font-medium text-foreground">教務からの注意事項</h3>
+              <div className="mt-2 text-sm text-muted-foreground">
+                <p className="w-full whitespace-pre-line text-muted-foreground">
                   {notice}
                 </p>
               </div>
@@ -443,12 +478,12 @@ export default function StudentPage() {
           </div>
         </div>
 
-        <div className="bg-blue-50 p-4 mb-6 rounded-lg">
-          <div className="text-blue-800 font-medium space-y-2">
+        <div className="bg-muted dark:bg-slate-700/60 p-4 mb-6 rounded-lg">
+          <div className="text-foreground font-medium space-y-2">
             <p>📢 予約システムの使い方：</p>
             <ul className="list-disc list-inside text-sm space-y-1 ml-4">
               <li>各日付で最大3つの教室予約が可能です</li>
-              <li>各予約について第5希望まで選択できます</li>
+              <li>各予約について第3希望まで選択できます</li>
               <li>予約数を選択後、各予約の希望順位をプルダウンで設定してください</li>
               <li>設定完了後、画面下の「申込を完了」をクリックしてください</li>
             </ul>
@@ -457,10 +492,10 @@ export default function StudentPage() {
 
         {/* 週選択 */}
         {reservationPeriod && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">📅 予約期間選択</h3>
+          <div className="bg-card rounded-lg shadow-md p-6 mb-6">
+            <h3 className="text-lg font-medium text-foreground mb-4">📅 予約期間選択</h3>
             <div className="space-y-3">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 予約可能期間: {reservationPeriod && (
                   <>
                     {reservationPeriod.reservationStartDate.getMonth() + 1}/{reservationPeriod.reservationStartDate.getDate()} 
@@ -475,7 +510,7 @@ export default function StudentPage() {
                   className={`px-4 py-2 rounded-md transition-colors duration-200 ${
                     selectedWeek === 'first'
                       ? 'bg-green-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      : 'bg-muted dark:bg-slate-700 text-foreground hover:bg-muted dark:hover:bg-slate-600'
                   }`}
                 >
                   前半週 ({reservationPeriod.firstWeek.startDate.getMonth() + 1}/{reservationPeriod.firstWeek.startDate.getDate()} 〜 {reservationPeriod.firstWeek.endDate.getMonth() + 1}/{reservationPeriod.firstWeek.endDate.getDate()})
@@ -485,7 +520,7 @@ export default function StudentPage() {
                   className={`px-4 py-2 rounded-md transition-colors duration-200 ${
                     selectedWeek === 'second'
                       ? 'bg-green-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      : 'bg-muted dark:bg-slate-700 text-foreground hover:bg-muted dark:hover:bg-slate-600'
                   }`}
                 >
                   後半週 ({reservationPeriod.secondWeek.startDate.getMonth() + 1}/{reservationPeriod.secondWeek.startDate.getDate()} 〜 {reservationPeriod.secondWeek.endDate.getMonth() + 1}/{reservationPeriod.secondWeek.endDate.getDate()})
@@ -496,99 +531,80 @@ export default function StudentPage() {
         )}
 
         {/* 新しい予約システム：日付別希望入力 */}
-        <div className="space-y-6 mb-6">
+        <Accordion type="multiple" className="space-y-4 mb-6">
           {dates.map((date) => {
             const dateReservation = dateReservations[date];
             if (!dateReservation) return null;
 
+            const isDone = dateReservation.slots.some((slot) =>
+              slot.preferences.some((pref) => pref !== '')
+            );
+
             return (
-              <div key={date} className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center justify-between mb-4">
-                  {(() => {
-                    const isDone = dateReservation.slots.some(slot => slot.preferences.some(pref => pref !== ''));
-                    return (
-                      <h3 className="text-lg font-medium text-gray-900 flex items-center">
-                        {date}の予約
+              <AccordionItem value={date} key={date}>
+                <AccordionTrigger
+                  className="text-lg bg-card shadow-md rounded-md px-4 py-3 mb-2 flex items-center justify-between hover:bg-muted [&[data-state=open]]:rounded-b-none"
+                >
+                  <span>
+                    {date} の予約
                         {isDone && (
                           <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                             済
                           </span>
                         )}
-                      </h3>
-                    );
-                  })()}
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm font-medium text-gray-700">予約数:</label>
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <Card className="p-4 border-t-0 rounded-t-none shadow-md">
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-end mb-2">
+                        <label className="text-sm font-medium mr-2">予約数:</label>
                     <select
                       value={dateReservation.slotCount}
                       onChange={(e) => updateSlotCount(date, parseInt(e.target.value))}
-                      className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+                          className="px-3 py-1 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 text-foreground dark:text-foreground"
                     >
                       <option value={1}>1つ</option>
                       <option value={2}>2つ</option>
                       <option value={3}>3つ</option>
                     </select>
                   </div>
-                </div>
-
-                <div className="space-y-4">
                   {dateReservation.slots.map((slot, slotIndex) => (
-                    <div key={slotIndex} className="border border-gray-200 rounded-lg p-4">
-                      <h4 className="text-md font-medium text-gray-800 mb-3">
-                        予約 {slotIndex + 1}
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                        {slot.preferences.map((preference, prefIndex) => (
+                        <div key={slotIndex} className="border border-muted rounded-lg p-4 bg-background dark:bg-slate-700/40">
+                          <h4 className="text-md font-medium mb-3">予約 {slotIndex + 1}</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {Array.from({ length: MAX_PREFS }, (_, prefIndex) => {
+                              const preference = slot.preferences[prefIndex] || '';
+                              return (
                           <div key={prefIndex}>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                  <label className="block text-xs font-medium text-muted-foreground mb-1">
                               第{prefIndex + 1}希望
                             </label>
                                                          <select
                                value={preference}
                                onChange={(e) => updatePreference(date, slotIndex, prefIndex, e.target.value)}
-                               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+                                    className="w-full px-3 py-2 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 text-foreground dark:text-foreground"
                              >
                                <option value="">選択してください</option>
-                               {getAvailableClassroomOptions(date).map((option) => (
+                                    {getAvailableClassroomOptions(date, preference).map((option) => (
                                  <option key={option.value} value={option.value}>
                                    {option.label}
                                  </option>
                                ))}
                              </select>
                           </div>
-                        ))}
+                              );
+                            })}
                       </div>
                     </div>
                   ))}
-                </div>
-
-                {/* 抽選結果表示 */}
-                <div className="mt-4">
-                  <h5 className="text-sm font-medium text-gray-700 mb-2">この日の抽選結果</h5>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.entries(allocationResults)
-                      .filter(([key]) => key.includes(date))
-                      .map(([key, result]) => {
-                        const [room] = key.split('_');
-                        return (
-                          <span
-                            key={key}
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              result === "当選"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800 line-through"
-                            }`}
-                          >
-                            {room}: {result}
-                          </span>
-                        );
-                      })}
-                  </div>
-                </div>
-              </div>
+                    </CardContent>
+                  </Card>
+                </AccordionContent>
+              </AccordionItem>
             );
           })}
-        </div>
+        </Accordion>
 
         <button
           onClick={submitSelection}

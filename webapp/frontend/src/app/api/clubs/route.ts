@@ -58,3 +58,47 @@ export async function POST(request: Request) {
     );
   }
 } 
+
+// パスワード変更
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const { name, password } = body;
+
+    if (!name || !password) {
+      return NextResponse.json({ error: 'name と password が必要です' }, { status: 400 });
+    }
+
+    const updated = await prisma.club.update({
+      where: { name },
+      data: { password },
+    });
+
+    return NextResponse.json({ message: 'パスワードを更新しました', club: updated });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: '更新に失敗しました' }, { status: 500 });
+  }
+}
+
+// クラブ削除
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json();
+    const { name } = body;
+
+    if (!name) {
+      return NextResponse.json({ error: 'name が必要です' }, { status: 400 });
+    }
+
+    // 関連予約を削除
+    await prisma.reservation.deleteMany({ where: { club: { name } } });
+
+    await prisma.club.delete({ where: { name } });
+
+    return NextResponse.json({ message: '部活を削除しました' });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: '削除に失敗しました' }, { status: 500 });
+  }
+} 

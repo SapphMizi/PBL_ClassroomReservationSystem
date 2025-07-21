@@ -9,6 +9,7 @@
 - 教室予約申請フォーム
 - 抽選結果の表示（当選/落選）
 - 申請データのJSON出力
+- 抽選履歴の閲覧
 
 ### 教務機能
 - 教務ログイン（パスワード認証）
@@ -16,11 +17,14 @@
 - 教室利用可否の変更
 - 予約申請の承認/却下
 - システム設定（注意事項、抽選設定）
+- 抽選実行・履歴の確認
+- ポイント管理
 
 ## 技術スタック
 
 - **フロントエンド**: Next.js 14, TypeScript, Tailwind CSS
-- **バックエンド**: Next.js API Routes
+- **バックエンド**: Next.js API Routes + Prisma ORM
+- **データベース**: SQLite (開発環境) / PostgreSQL・MySQL 等に置き換え可能
 - **UI**: モダンなレスポンシブデザイン
 
 ## セットアップ
@@ -47,6 +51,23 @@ npm run dev
 ```
 
 4. ブラウザで http://localhost:3000 にアクセス
+
+### データベースの準備
+
+1. プロジェクトルートに `.env` を作成し、以下を記述します（SQLite 利用例）。
+
+```env
+DATABASE_PROVIDER=sqlite
+DATABASE_URL="file:./prisma/dev.db"
+```
+
+2. スキーマを DB に適用（初回のみ）
+
+```bash
+npx prisma db push
+```
+
+> `npm install` 実行時に `prisma generate` と `prisma migrate deploy` が自動実行されるため、通常は追加操作は不要です。
 
 ## 使用方法
 
@@ -86,36 +107,17 @@ src/
 │   ├── api/
 │   │   ├── classrooms/route.ts    # 教室データAPI
 │   │   ├── clubs/route.ts         # 部活データAPI
-│   │   └── reservations/route.ts  # 予約データAPI
-│   ├── pages/
-│   │   ├── student.tsx            # 学生用ページ
-│   │   └── admin.tsx              # 教務用ページ
+│   │   ├── reservations/route.ts  # 予約データAPI
+│   │   └── lottery/route.ts          # 抽選API
+│   ├── admin/                         # 教務用ページ
+│   ├── student/                       # 学生用ページ
+│   ├── lottery-results/              # 抽選結果ページ
 │   ├── globals.css                # グローバルスタイル
 │   ├── layout.tsx                 # レイアウト
 │   └── page.tsx                   # ホームページ
 ```
 
-## 主な改善点
 
-元の`reservation_with_results.html`から以下の改善を行いました：
-
-1. **モダンなUI/UX**: Tailwind CSSを使用した美しいデザイン
-2. **レスポンシブ対応**: モバイル・タブレット・デスクトップ対応
-3. **型安全性**: TypeScriptによる型チェック
-4. **API連携**: Next.js API Routesによるバックエンド機能
-5. **状態管理**: React Hooksによる効率的な状態管理
-6. **エラーハンドリング**: 適切なエラー処理とユーザーフィードバック
-7. **セキュリティ**: パスワード認証の実装
-8. **拡張性**: モジュール化された構造で将来の機能追加に対応
-
-## 今後の拡張予定
-
-- データベース連携（PostgreSQL, MySQL等）
-- リアルタイム通知機能
-- 抽選アルゴリズムの実装
-- 予約履歴の管理
-- レポート機能
-- 管理者権限の細分化
 
 ## ライセンス
 
