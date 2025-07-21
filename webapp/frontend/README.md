@@ -22,10 +22,12 @@
 
 ## 技術スタック
 
-- **フロントエンド**: Next.js 14, TypeScript, Tailwind CSS
-- **バックエンド**: Next.js API Routes + Prisma ORM
+- **フロントエンド**: Next.js 15.3.3 (最新) + App Router, TypeScript, Tailwind CSS v4
+- **バックエンド**: Next.js API Routes + Prisma ORM 6.11.1
 - **データベース**: SQLite (開発環境) / PostgreSQL・MySQL 等に置き換え可能
-- **UI**: モダンなレスポンシブデザイン
+- **UI Framework**: Radix UI, Lucide React Icons
+- **スタイリング**: Tailwind CSS v4 (最新) + Tailwind Animate
+- **開発環境**: Turbopack対応, TypeScript 5, React 19.0.0
 
 ## セットアップ
 
@@ -45,7 +47,7 @@ cd pbl_sample/webapp/frontend
 npm install
 ```
 
-3. 開発サーバーを起動
+3. 開発サーバーを起動（Turbopack使用）
 ```bash
 npm run dev
 ```
@@ -61,7 +63,7 @@ DATABASE_PROVIDER=sqlite
 DATABASE_URL="file:./prisma/dev.db"
 ```
 
-2. スキーマを DB に適用（初回のみ）
+2. スキーマをDBに適用（初回のみ）
 
 ```bash
 npx prisma db push
@@ -99,25 +101,73 @@ npx prisma db push
 ### 教務
 - パスワード: admin
 
-## ファイル構成
+## プロジェクト構成
 
 ```
 src/
-├── app/
-│   ├── api/
+├── app/                     # Next.js App Router
+│   ├── api/                 # API Routes
 │   │   ├── classrooms/route.ts    # 教室データAPI
 │   │   ├── clubs/route.ts         # 部活データAPI
 │   │   ├── reservations/route.ts  # 予約データAPI
-│   │   └── lottery/route.ts          # 抽選API
-│   ├── admin/                         # 教務用ページ
-│   ├── student/                       # 学生用ページ
-│   ├── lottery-results/              # 抽選結果ページ
-│   ├── globals.css                # グローバルスタイル
-│   ├── layout.tsx                 # レイアウト
-│   └── page.tsx                   # ホームページ
+│   │   └── lottery/route.ts       # 抽選API
+│   ├── admin/               # 教務用ページ
+│   ├── student/             # 学生用ページ
+│   ├── lottery-results/     # 抽選結果ページ
+│   ├── globals.css          # グローバルスタイル
+│   ├── layout.tsx           # ルートレイアウト
+│   └── page.tsx             # ホームページ
+├── components/              # 再利用可能コンポーネント
+├── lib/                     # ユーティリティ関数
+└── utils/                   # 共通処理
 ```
 
+## 開発スクリプト
 
+```bash
+# 開発サーバー起動（Turbopack使用）
+npm run dev
+
+# 本番ビルド
+npm run build
+
+# 本番サーバー起動
+npm start
+
+# リンター実行
+npm run lint
+```
+
+## 主要依存関係
+
+### フロントエンド
+- **Next.js**: 15.3.3 (React 19対応、Turbopack安定版)
+- **React**: 19.0.0 (最新安定版)
+- **TypeScript**: 5.x (型安全性)
+- **Tailwind CSS**: v4 (最新、改良されたパフォーマンス)
+
+### UI コンポーネント
+- **Radix UI**: モダンなUIプリミティブ
+- **Lucide React**: アイコンライブラリ
+- **class-variance-authority**: CSS-in-JSユーティリティ
+- **next-themes**: ダークモードサポート
+
+### データベース・バックエンド
+- **Prisma**: 6.11.1 (最新ORM)
+- **SQLite**: 開発環境用DB
+
+## 最新機能
+
+### Next.js 15の新機能
+- **React 19サポート**: 最新のReact機能を活用
+- **Turbopack安定版**: 高速な開発体験
+- **改善されたキャッシュ戦略**: より柔軟なデータ管理
+- **Error UIの改善**: 開発時のデバッグ体験向上
+
+### Tailwind CSS v4の新機能
+- **ゼロランタイム**: CSS-in-JSからの移行
+- **改善されたパフォーマンス**: より高速なビルド
+- **新しいカラーパレット**: モダンなデザインシステム
 
 ## ライセンス
 
