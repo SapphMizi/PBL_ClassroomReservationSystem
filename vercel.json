@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd pbl_sample/webapp/frontend && npx prisma generate && npm run build",
-  "devCommand": "cd pbl_sample/webapp/frontend && npm run dev", 
-  "installCommand": "cd pbl_sample/webapp/frontend && npm install",
+  "buildCommand": "npx prisma generate && npm run build",
+  "devCommand": "npm run dev", 
+  "installCommand": "npm install",
   "framework": "nextjs",
-  "outputDirectory": "pbl_sample/webapp/frontend/.next"
+  "outputDirectory": ".next"
 } 
