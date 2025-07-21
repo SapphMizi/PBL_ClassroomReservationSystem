@@ -3,6 +3,5 @@
   "devCommand": "cd pbl_sample/webapp/frontend && npm run dev", 
   "installCommand": "cd pbl_sample/webapp/frontend && npm install",
   "framework": "nextjs",
-  "outputDirectory": "pbl_sample/webapp/frontend/.next",
-  "rootDirectory": "pbl_sample/webapp/frontend"
+  "outputDirectory": "pbl_sample/webapp/frontend/.next"
 } 
