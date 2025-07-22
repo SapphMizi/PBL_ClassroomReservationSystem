@@ -19,8 +19,8 @@ export default function SiteHeader() {
           <Button asChild variant="ghost" size="sm">
             <Link href="/admin">教務</Link>
           </Button>
-          <Button asChild variant="ghost" size="sm" target="_blank">
-            <Link href="/lottery-results">抽選結果</Link>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/lottery-results" target="_blank">抽選結果</Link>
           </Button>
           <ThemeToggle />
         </nav>

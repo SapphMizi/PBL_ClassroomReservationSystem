@@ -119,4 +119,21 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Select elements styling for better visibility */
+  select {
+    color-scheme: light;
+  }
+  
+  .dark select {
+    color-scheme: dark;
+  }
+  
+  select option {
+    @apply bg-background text-foreground;
+  }
+  
+  .dark select option {
+    @apply bg-card text-card-foreground;
+  }
 }

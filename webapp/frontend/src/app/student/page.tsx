@@ -70,9 +70,19 @@ export default function StudentPage() {
   const [reservationPeriod, setReservationPeriod] = useState<ReservationPeriod | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<'first' | 'second'>('first');
   const [dates, setDates] = useState<string[]>([]);
+  
+  // クライアントサイドでの初期化完了を示すフラグ
+  const [isClientInitialized, setIsClientInitialized] = useState(false);
 
-  // adminNote を読み込み
+  // クライアントサイドでの初期化
   useEffect(() => {
+    // クライアントサイドでのみ実行される処理
+    setIsClientInitialized(true);
+    
+    fetchClassrooms();
+    fetchClubs();
+    
+    // adminNote を読み込み
     try {
       const saved = localStorage.getItem('adminNote');
       if (saved) {
@@ -81,16 +91,15 @@ export default function StudentPage() {
     } catch (e) {
       console.error('adminNote の読み込みに失敗しました', e);
     }
-  }, []);
-
-  useEffect(() => {
-    fetchClassrooms();
-    fetchClubs();
     
     // 管理画面で設定された教室の利用可否状態を読み込み
-    const savedRoomStatus = localStorage.getItem('roomStatus');
-    if (savedRoomStatus) {
-      setRoomStatus(JSON.parse(savedRoomStatus));
+    try {
+      const savedRoomStatus = localStorage.getItem('roomStatus');
+      if (savedRoomStatus) {
+        setRoomStatus(JSON.parse(savedRoomStatus));
+      }
+    } catch (e) {
+      console.error('roomStatus の読み込みに失敗しました', e);
     }
     
     // 新しい日付管理システムの初期化
@@ -115,7 +124,7 @@ export default function StudentPage() {
 
   // 週選択が変更されたときの処理
   useEffect(() => {
-    if (reservationPeriod) {
+    if (reservationPeriod && isClientInitialized) {
       const weekPeriod = selectedWeek === 'first' ? reservationPeriod.firstWeek : reservationPeriod.secondWeek;
       const newDates = generateWeekDates(weekPeriod);
       setDates(newDates);
@@ -136,7 +145,7 @@ export default function StudentPage() {
         return updated;
       });
     }
-  }, [selectedWeek, reservationPeriod]);
+  }, [selectedWeek, reservationPeriod, isClientInitialized]);
 
   const fetchClassrooms = async () => {
     try {
@@ -355,10 +364,12 @@ export default function StudentPage() {
         console.log('予約申請結果:', result);
 
         // ローカルストレージに保存
-        try {
-          localStorage.setItem(`studentReservations_${selectedClub}`, JSON.stringify(dateReservations));
-        } catch (e) {
-          console.error('ローカルストレージへの保存に失敗しました', e);
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(`studentReservations_${selectedClub}`, JSON.stringify(dateReservations));
+          } catch (e) {
+            console.error('ローカルストレージへの保存に失敗しました', e);
+          }
         }
       } else {
         alert('予約申請の送信に失敗しました。');
@@ -371,7 +382,7 @@ export default function StudentPage() {
 
   // ログイン後に保存済みの予約データを読み込む
   useEffect(() => {
-    if (isLoggedIn) {
+    if (isLoggedIn && isClientInitialized) {
       try {
         const saved = localStorage.getItem(`studentReservations_${selectedClub}`);
         if (saved) {
@@ -383,7 +394,7 @@ export default function StudentPage() {
         console.error('ローカルストレージからの読み込みに失敗しました', e);
       }
     }
-  }, [isLoggedIn, selectedClub]);
+  }, [isLoggedIn, selectedClub, isClientInitialized]);
 
   if (!isLoggedIn) {
     return (
@@ -491,7 +502,7 @@ export default function StudentPage() {
         </div>
 
         {/* 週選択 */}
-        {reservationPeriod && (
+        {reservationPeriod && isClientInitialized && (
           <div className="bg-card rounded-lg shadow-md p-6 mb-6">
             <h3 className="text-lg font-medium text-foreground mb-4">📅 予約期間選択</h3>
             <div className="space-y-3">
@@ -531,8 +542,19 @@ export default function StudentPage() {
         )}
 
         {/* 新しい予約システム：日付別希望入力 */}
-        <Accordion type="multiple" className="space-y-4 mb-6">
-          {dates.map((date) => {
+        {!isClientInitialized ? (
+          <div className="bg-card rounded-lg shadow-md p-6 mb-6">
+            <div className="animate-pulse">
+              <div className="h-6 bg-muted rounded mb-4"></div>
+              <div className="space-y-3">
+                <div className="h-4 bg-muted rounded w-3/4"></div>
+                <div className="h-4 bg-muted rounded w-1/2"></div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <Accordion type="multiple" className="space-y-4 mb-6">
+            {dates.map((date) => {
             const dateReservation = dateReservations[date];
             if (!dateReservation) return null;
 
@@ -562,7 +584,7 @@ export default function StudentPage() {
                     <select
                       value={dateReservation.slotCount}
                       onChange={(e) => updateSlotCount(date, parseInt(e.target.value))}
-                          className="px-3 py-1 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 text-foreground dark:text-foreground"
+                          className="px-3 py-1 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-background text-foreground dark:bg-card dark:text-card-foreground"
                     >
                       <option value={1}>1つ</option>
                       <option value={2}>2つ</option>
@@ -583,7 +605,7 @@ export default function StudentPage() {
                                                          <select
                                value={preference}
                                onChange={(e) => updatePreference(date, slotIndex, prefIndex, e.target.value)}
-                                    className="w-full px-3 py-2 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 text-foreground dark:text-foreground"
+                                    className="w-full px-3 py-2 border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-background text-foreground dark:bg-card dark:text-card-foreground"
                              >
                                <option value="">選択してください</option>
                                     {getAvailableClassroomOptions(date, preference).map((option) => (
@@ -605,6 +627,7 @@ export default function StudentPage() {
             );
           })}
         </Accordion>
+        )}
 
         <button
           onClick={submitSelection}
