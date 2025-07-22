@@ -9,6 +9,7 @@
 - 教室予約申請フォーム
 - 抽選結果の表示（当選/落選）
 - 申請データのJSON出力
+- 抽選履歴の閲覧
 
 ### 教務機能
 - 教務ログイン（パスワード認証）
@@ -16,12 +17,17 @@
 - 教室利用可否の変更
 - 予約申請の承認/却下
 - システム設定（注意事項、抽選設定）
+- 抽選実行・履歴の確認
+- ポイント管理
 
 ## 技術スタック
 
-- **フロントエンド**: Next.js 14, TypeScript, Tailwind CSS
-- **バックエンド**: Next.js API Routes
-- **UI**: モダンなレスポンシブデザイン
+- **フロントエンド**: Next.js 15.3.3 (最新) + App Router, TypeScript, Tailwind CSS v4
+- **バックエンド**: Next.js API Routes + Prisma ORM 6.11.1
+- **データベース**: SQLite (開発環境) / PostgreSQL・MySQL 等に置き換え可能
+- **UI Framework**: Radix UI, Lucide React Icons
+- **スタイリング**: Tailwind CSS v4 (最新) + Tailwind Animate
+- **開発環境**: Turbopack対応, TypeScript 5, React 19.0.0
 
 ## セットアップ
 
@@ -41,12 +47,29 @@ cd pbl_sample/webapp/frontend
 npm install
 ```
 
-3. 開発サーバーを起動
+3. 開発サーバーを起動（Turbopack使用）
 ```bash
 npm run dev
 ```
 
 4. ブラウザで http://localhost:3000 にアクセス
+
+### データベースの準備
+
+1. プロジェクトルートに `.env` を作成し、以下を記述します（SQLite 利用例）。
+
+```env
+DATABASE_PROVIDER=sqlite
+DATABASE_URL="file:./prisma/dev.db"
+```
+
+2. スキーマをDBに適用（初回のみ）
+
+```bash
+npx prisma db push
+```
+
+> `npm install` 実行時に `prisma generate` と `prisma migrate deploy` が自動実行されるため、通常は追加操作は不要です。
 
 ## 使用方法
 
@@ -78,44 +101,73 @@ npm run dev
 ### 教務
 - パスワード: admin
 
-## ファイル構成
+## プロジェクト構成
 
 ```
 src/
-├── app/
-│   ├── api/
+├── app/                     # Next.js App Router
+│   ├── api/                 # API Routes
 │   │   ├── classrooms/route.ts    # 教室データAPI
 │   │   ├── clubs/route.ts         # 部活データAPI
-│   │   └── reservations/route.ts  # 予約データAPI
-│   ├── pages/
-│   │   ├── student.tsx            # 学生用ページ
-│   │   └── admin.tsx              # 教務用ページ
-│   ├── globals.css                # グローバルスタイル
-│   ├── layout.tsx                 # レイアウト
-│   └── page.tsx                   # ホームページ
+│   │   ├── reservations/route.ts  # 予約データAPI
+│   │   └── lottery/route.ts       # 抽選API
+│   ├── admin/               # 教務用ページ
+│   ├── student/             # 学生用ページ
+│   ├── lottery-results/     # 抽選結果ページ
+│   ├── globals.css          # グローバルスタイル
+│   ├── layout.tsx           # ルートレイアウト
+│   └── page.tsx             # ホームページ
+├── components/              # 再利用可能コンポーネント
+├── lib/                     # ユーティリティ関数
+└── utils/                   # 共通処理
 ```
 
-## 主な改善点
+## 開発スクリプト
 
-元の`reservation_with_results.html`から以下の改善を行いました：
+```bash
+# 開発サーバー起動（Turbopack使用）
+npm run dev
 
-1. **モダンなUI/UX**: Tailwind CSSを使用した美しいデザイン
-2. **レスポンシブ対応**: モバイル・タブレット・デスクトップ対応
-3. **型安全性**: TypeScriptによる型チェック
-4. **API連携**: Next.js API Routesによるバックエンド機能
-5. **状態管理**: React Hooksによる効率的な状態管理
-6. **エラーハンドリング**: 適切なエラー処理とユーザーフィードバック
-7. **セキュリティ**: パスワード認証の実装
-8. **拡張性**: モジュール化された構造で将来の機能追加に対応
+# 本番ビルド
+npm run build
 
-## 今後の拡張予定
+# 本番サーバー起動
+npm start
 
-- データベース連携（PostgreSQL, MySQL等）
-- リアルタイム通知機能
-- 抽選アルゴリズムの実装
-- 予約履歴の管理
-- レポート機能
-- 管理者権限の細分化
+# リンター実行
+npm run lint
+```
+
+## 主要依存関係
+
+### フロントエンド
+- **Next.js**: 15.3.3 (React 19対応、Turbopack安定版)
+- **React**: 19.0.0 (最新安定版)
+- **TypeScript**: 5.x (型安全性)
+- **Tailwind CSS**: v4 (最新、改良されたパフォーマンス)
+
+### UI コンポーネント
+- **Radix UI**: モダンなUIプリミティブ
+- **Lucide React**: アイコンライブラリ
+- **class-variance-authority**: CSS-in-JSユーティリティ
+- **next-themes**: ダークモードサポート
+
+### データベース・バックエンド
+- **Prisma**: 6.11.1 (最新ORM)
+- **SQLite**: 開発環境用DB
+
+## 最新機能
+
+### Next.js 15の新機能
+- **React 19サポート**: 最新のReact機能を活用
+- **Turbopack安定版**: 高速な開発体験
+- **改善されたキャッシュ戦略**: より柔軟なデータ管理
+- **Error UIの改善**: 開発時のデバッグ体験向上
+
+### Tailwind CSS v4の新機能
+- **ゼロランタイム**: CSS-in-JSからの移行
+- **改善されたパフォーマンス**: より高速なビルド
+- **新しいカラーパレット**: モダンなデザインシステム
 
 ## ライセンス
 
